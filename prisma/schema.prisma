@@ -1,0 +1,165 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IssueType {
+  UNAVAILABLE
+  SLOW
+  LOGIN
+  CONNECTIVITY
+  OTHER
+}
+
+enum IncidentState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum NotificationState {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum IncidentUpdateType {
+  OPENED
+  ACKNOWLEDGED
+  RESOLVED
+  REOPENED
+  NOTE
+}
+
+model Service {
+  id                      String              @id @default(uuid()) @db.Uuid
+  name                    String
+  slug                    String              @unique
+  category                String
+  ownerEmail              String
+  thresholdCount          Int
+  thresholdWindowMinutes  Int
+  issueTypes              IssueType[]
+  enabled                 Boolean             @default(true)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  reports                 Report[]
+  reporterCooldowns       ReporterCooldown[]
+  incidents               Incident[]
+}
+
+model Report {
+  id                String    @id @default(uuid()) @db.Uuid
+  serviceId         String    @db.Uuid
+  issueType         IssueType
+  reporterTokenHmac String
+  note              String?
+  reportedAt        DateTime  @default(now())
+  service           Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId, reportedAt])
+}
+
+model ReporterCooldown {
+  id                String   @id @default(uuid()) @db.Uuid
+  serviceId         String   @db.Uuid
+  reporterTokenHmac String
+  lastReportedAt    DateTime
+  service           Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, reporterTokenHmac])
+}
+
+model Incident {
+  id                      String            @id @default(uuid()) @db.Uuid
+  serviceId               String            @db.Uuid
+  state                   IncidentState     @default(OPEN)
+  thresholdCountSnapshot  Int
+  thresholdWindowSnapshot Int
+  reportCountAtOpening    Int
+  openedAt                DateTime          @default(now())
+  acknowledgedAt          DateTime?
+  resolvedAt              DateTime?
+  service                 Service           @relation(fields: [serviceId], references: [id])
+  updates                 IncidentUpdate[]
+  notificationJobs        NotificationJob[]
+
+  @@index([serviceId, state])
+}
+
+model IncidentUpdate {
+  id         String              @id @default(uuid()) @db.Uuid
+  incidentId String              @db.Uuid
+  updateType IncidentUpdateType
+  authorType String
+  authorId   String?
+  note       String?
+  createdAt  DateTime            @default(now())
+  incident   Incident            @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+}
+
+model NotificationJob {
+  id               String            @id @default(uuid()) @db.Uuid
+  incidentId       String            @db.Uuid
+  notificationType String
+  recipientEmail   String
+  state            NotificationState @default(PENDING)
+  nextAttempt      DateTime
+  attempts         Int               @default(0)
+  lastError        String?
+  deliveredAt      DateTime?
+  lockedUntil      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  incident         Incident          @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([state, nextAttempt])
+}
+
+model AdminAccount {
+  id           String         @id @default(uuid()) @db.Uuid
+  username     String         @unique
+  passwordHash String
+  displayName  String
+  enabled      Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+  auditEvents  AuditEvent[]
+}
+
+model AdminSession {
+  id        String       @id @default(uuid()) @db.Uuid
+  accountId String       @db.Uuid
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime     @default(now())
+  account   AdminAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, expiresAt])
+  @@index([tokenHash])
+}
+
+model AuditEvent {
+  id           String        @id @default(uuid()) @db.Uuid
+  accountId    String?       @db.Uuid
+  action       String
+  entityType   String?
+  entityId     String?
+  metadata     Json?
+  occurredAt   DateTime      @default(now())
+  account      AdminAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, occurredAt])
+  @@index([entityType, entityId])
+}

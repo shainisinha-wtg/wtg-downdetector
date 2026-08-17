@@ -13,6 +13,9 @@
     "test:e2e": "playwright test",
     "worker": "tsx src/worker/index.ts"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "next": "^15.1.8",
     "react": "^19.0.0",
