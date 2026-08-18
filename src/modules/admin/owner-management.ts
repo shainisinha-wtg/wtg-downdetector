@@ -1,17 +1,62 @@
 import { IssueType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-export interface ServiceConfigurationUpdate {
-  serviceId: string;
+export interface ServiceConfigurationCreate {
+  name: string;
+  slug: string;
+  category: string;
   thresholdCount: number;
   thresholdWindowMinutes: number;
   ownerEmail: string;
   issueTypes: IssueType[];
+  enabled: boolean;
+}
+
+export interface ServiceConfigurationUpdate {
+  serviceId: string;
+  category: string;
+  thresholdCount: number;
+  thresholdWindowMinutes: number;
+  ownerEmail: string;
+  issueTypes: IssueType[];
+  enabled: boolean;
+}
+
+export async function createServiceConfiguration(
+  input: ServiceConfigurationCreate,
+  accountId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    const service = await tx.service.create({ data: input });
+
+    await tx.auditEvent.create({
+      data: {
+        accountId,
+        action: "SERVICE_CREATED",
+        entityType: "SERVICE",
+        entityId: service.id,
+        metadata: {
+          after: {
+            name: service.name,
+            slug: service.slug,
+            category: service.category,
+            ownerEmail: service.ownerEmail,
+            thresholdCount: service.thresholdCount,
+            thresholdWindowMinutes: service.thresholdWindowMinutes,
+            issueTypes: service.issueTypes,
+            enabled: service.enabled,
+          },
+        },
+      },
+    });
+
+    return service;
+  });
 }
 
 export async function updateServiceConfiguration(
   input: ServiceConfigurationUpdate,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const oldService = await tx.service.findUnique({
@@ -23,10 +68,12 @@ export async function updateServiceConfiguration(
     await tx.service.update({
       where: { id: input.serviceId },
       data: {
+        category: input.category,
         thresholdCount: input.thresholdCount,
         thresholdWindowMinutes: input.thresholdWindowMinutes,
         ownerEmail: input.ownerEmail,
         issueTypes: input.issueTypes,
+        enabled: input.enabled,
       },
     });
 
@@ -41,6 +88,7 @@ export async function updateServiceConfiguration(
             thresholdCount: oldService.thresholdCount,
             thresholdWindowMinutes: oldService.thresholdWindowMinutes,
             ownerEmail: oldService.ownerEmail,
+            category: oldService.category,
             enabled: oldService.enabled,
             issueTypes: oldService.issueTypes,
           },
@@ -48,7 +96,8 @@ export async function updateServiceConfiguration(
             thresholdCount: input.thresholdCount,
             thresholdWindowMinutes: input.thresholdWindowMinutes,
             ownerEmail: input.ownerEmail,
-            enabled: oldService.enabled,
+            category: input.category,
+            enabled: input.enabled,
             issueTypes: input.issueTypes,
           },
         },
@@ -59,7 +108,7 @@ export async function updateServiceConfiguration(
 
 export async function retryFailedNotification(
   jobId: string,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const job = await tx.notificationJob.findUnique({ where: { id: jobId } });

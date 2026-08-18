@@ -156,6 +156,7 @@ The owner workflow was hardened after review:
 - Extracted service configuration and notification retry transactions into production owner-management functions.
 - Added before/after service configuration audits, including issue types.
 - Reset notification attempts, errors, locks, and scheduling during manual retry.
+- Added audited service creation and complete editing of category, issue types, owner email, thresholds, and enabled state.
 
 ### Final Verification
 
@@ -169,5 +170,5 @@ git diff --check
 ```
 
 - Unit tests: 11 passed
-- Integration tests: 23 passed
+- Integration tests: 24 passed
 - Typecheck, lint, production build, and whitespace checks passed

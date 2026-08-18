@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireAdmin, ADMIN_COOKIE_NAME } from "@/modules/auth/require-admin";
 import { revokeSession } from "@/modules/auth/session";
 import {
+  createServiceConfiguration,
   retryFailedNotification,
   updateServiceConfiguration,
 } from "@/modules/admin/owner-management";
@@ -18,13 +19,35 @@ import {
 } from "@/modules/incidents/incident-management";
 
 // Validation schemas
-const updateServiceSchema = z.object({
-  serviceId: z.string().uuid(),
+const serviceFieldsSchema = z.object({
+  category: z.string().trim().min(1).max(100),
   thresholdCount: z.number().int().min(1).max(1000),
   thresholdWindowMinutes: z.number().int().min(1).max(1440),
   ownerEmail: z.string().email(),
-  issueTypes: z.array(z.enum(["UNAVAILABLE", "SLOW", "LOGIN", "CONNECTIVITY", "OTHER"])),
+  issueTypes: z
+    .array(z.enum(["UNAVAILABLE", "SLOW", "LOGIN", "CONNECTIVITY", "OTHER"]))
+    .min(1),
+  enabled: z.boolean(),
 });
+
+const createServiceSchema = serviceFieldsSchema.extend({
+  name: z.string().trim().min(1).max(100),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Use lowercase letters, numbers, and hyphens",
+    ),
+});
+
+const updateServiceSchema = z
+  .object({
+    serviceId: z.string().uuid(),
+  })
+  .and(serviceFieldsSchema);
 
 const acknowledgeIncidentSchema = z.object({
   incidentId: z.string().uuid(),
@@ -63,6 +86,31 @@ export async function logout() {
   redirect("/admin/login");
 }
 
+export async function createService(data: unknown) {
+  const admin = await requireAdmin();
+
+  try {
+    const validated = createServiceSchema.parse(data);
+    await createServiceConfiguration(validated, admin.id);
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/services");
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        error:
+          "Validation failed: " +
+          error.errors.map((item) => item.message).join(", "),
+      };
+    }
+    console.error("Service creation failed");
+    return { error: "Failed to create service" };
+  }
+}
+
 /**
  * Update service configuration
  */
@@ -81,7 +129,10 @@ export async function updateService(data: unknown) {
     return { success: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { error: "Validation failed: " + error.errors.map(e => e.message).join(", ") };
+      return {
+        error:
+          "Validation failed: " + error.errors.map((e) => e.message).join(", "),
+      };
     }
     console.error("Service update failed");
     return { error: "Failed to update service" };
@@ -123,11 +174,7 @@ export async function publishIncidentUpdateAction(data: unknown) {
 
   try {
     const validated = publishUpdateSchema.parse(data);
-    await publishIncidentUpdate(
-      validated.incidentId,
-      admin.id,
-      validated.note
-    );
+    await publishIncidentUpdate(validated.incidentId, admin.id, validated.note);
 
     revalidatePath("/admin");
     revalidatePath("/admin/incidents/[id]", "page");
@@ -157,7 +204,7 @@ export async function resolveIncidentAction(data: unknown) {
     await resolveIncident(
       validated.incidentId,
       admin.id,
-      validated.finalMessage
+      validated.finalMessage,
     );
 
     revalidatePath("/admin");
@@ -197,6 +244,9 @@ export async function retryNotification(data: unknown) {
       return { error: "Validation failed" };
     }
     console.error("Notification retry failed");
-    return { error: error instanceof Error ? error.message : "Failed to retry notification" };
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to retry notification",
+    };
   }
 }
