@@ -49,6 +49,7 @@ model Service {
   thresholdWindowMinutes  Int
   issueTypes              IssueType[]
   enabled                 Boolean             @default(true)
+  detectionArmed          Boolean             @default(true)
   createdAt               DateTime            @default(now())
   updatedAt               DateTime            @updatedAt
   reports                 Report[]
