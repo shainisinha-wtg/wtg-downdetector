@@ -1,10 +1,17 @@
-export default function HomePage() {
+import { ServiceDashboard } from "@/components/service-dashboard";
+import { getServiceList } from "@/modules/services/service-queries";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const services = await getServiceList();
+
   return (
     <main>
-      <header><strong>WTG Downdetector</strong></header>
-      <section aria-labelledby="service-status-heading">
-        <h1 id="service-status-heading">Service status</h1>
-      </section>
+      <header>
+        <strong>WTG Downdetector</strong>
+      </header>
+      <ServiceDashboard services={services} />
     </main>
   );
 }

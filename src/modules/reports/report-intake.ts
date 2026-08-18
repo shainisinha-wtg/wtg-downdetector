@@ -11,6 +11,13 @@ export class DuplicateReportError extends Error {
   }
 }
 
+export class InvalidServiceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidServiceError";
+  }
+}
+
 export interface ReportReceipt {
   reportId: string;
   acceptedAt: Date;
@@ -58,11 +65,11 @@ export async function submitReport(
       });
 
       if (!service || !service.enabled) {
-        throw new Error("Service not found or disabled");
+        throw new InvalidServiceError("Service not found or disabled");
       }
 
       if (!service.issueTypes.includes(validated.issueType)) {
-        throw new Error("Issue type not supported for this service");
+        throw new InvalidServiceError("Issue type not supported for this service");
       }
 
       const now = new Date();
