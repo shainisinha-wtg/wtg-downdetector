@@ -33,6 +33,9 @@ export function createSmtpSender(
     port: config.SMTP_PORT,
     secure: false,
     requireTLS: true,
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 120_000,
     tls: { minVersion: "TLSv1.2" },
     auth: config.SMTP_USERNAME
       ? { user: config.SMTP_USERNAME, pass: config.SMTP_PASSWORD }

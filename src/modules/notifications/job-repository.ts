@@ -98,20 +98,21 @@ export async function deliverJob(
 
   try {
     await sendEmail(message);
-    await prisma.notificationJob.update({
-      where: { id: jobId },
-      data: {
-        state: "SENT",
-        attempts: { increment: 1 },
-        deliveredAt: new Date(),
-        lastError: null,
-        lockedUntil: null,
-      },
-    });
   } catch (error) {
     await recordDeliveryFailure(jobId, job.attempts, error);
     throw error;
   }
+
+  await prisma.notificationJob.update({
+    where: { id: jobId },
+    data: {
+      state: "SENT",
+      attempts: { increment: 1 },
+      deliveredAt: new Date(),
+      lastError: null,
+      lockedUntil: null,
+    },
+  });
 }
 
 async function recordDeliveryFailure(
