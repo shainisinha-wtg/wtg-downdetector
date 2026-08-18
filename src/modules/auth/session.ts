@@ -4,6 +4,23 @@ import { prisma } from "@/lib/db";
 const SESSION_DURATION_HOURS = 8;
 
 /**
+ * Get secure cookie options for admin session cookies.
+ *
+ * IMPORTANT: Secure flag is only disabled in test environment to allow automated
+ * HTTP-based route testing. Production and development environments must use HTTPS.
+ * This is an explicit test-only exemption, not a runtime security trade-off.
+ */
+export function getAdminCookieOptions(expiresAt: Date) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== "test",
+    sameSite: "lax" as const,
+    expires: expiresAt,
+    path: "/",
+  };
+}
+
+/**
  * Generate a 32-byte random token and return both raw and SHA-256 hash
  */
 function generateToken(): { raw: string; hash: string } {
@@ -17,11 +34,11 @@ function generateToken(): { raw: string; hash: string } {
  * Returns the raw token (to be sent in cookie) and expiry timestamp
  */
 export async function createSession(
-  accountId: string
+  accountId: string,
 ): Promise<{ token: string; expiresAt: Date }> {
   const { raw, hash } = generateToken();
   const expiresAt = new Date(
-    Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000
+    Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000,
   );
 
   await prisma.adminSession.create({
@@ -40,7 +57,7 @@ export async function createSession(
  * Returns null if session is invalid, expired, revoked, or account disabled
  */
 export async function getSessionAccount(
-  token: string
+  token: string,
 ): Promise<{ id: string; username: string; displayName: string } | null> {
   const hash = createHash("sha256").update(token).digest("hex");
 

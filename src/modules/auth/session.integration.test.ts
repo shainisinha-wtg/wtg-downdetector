@@ -151,5 +151,34 @@ describe("Auth Module Integration", () => {
       retrieved = await getSessionAccount(token);
       expect(retrieved).toBeNull();
     });
+
+    it("revokes session by raw token during logout", async () => {
+      const account = await prisma.adminAccount.create({
+        data: {
+          username: "testadmin",
+          passwordHash: await argon2.hash("password", { type: argon2.argon2id }),
+          displayName: "Test Admin",
+        },
+      });
+
+      const { token } = await createSession(account.id);
+
+      // Verify session works
+      const retrieved = await getSessionAccount(token);
+      expect(retrieved?.id).toBe(account.id);
+
+      // Revoke via raw token (logout use case)
+      await revokeSession(token);
+
+      // Session should be revoked in DB
+      const dbSession = await prisma.adminSession.findFirst({
+        where: { accountId: account.id },
+      });
+      expect(dbSession?.revokedAt).not.toBeNull();
+
+      // getSessionAccount should return null
+      const afterLogout = await getSessionAccount(token);
+      expect(afterLogout).toBeNull();
+    });
   });
 });

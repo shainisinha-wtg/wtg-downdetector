@@ -41,7 +41,8 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error("Bootstrap failed:", error.message);
+    // Sanitized error logging - never expose password or sensitive data
+    console.error("Bootstrap failed: Operation failed");
     process.exit(1);
   })
   .finally(async () => {

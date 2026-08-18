@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/modules/auth/require-admin";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
+import { LogoutButton } from "@/components/logout-button";
 
 export default async function AdminDashboardPage() {
   const admin = await requireAdmin();
@@ -55,8 +56,11 @@ export default async function AdminDashboardPage() {
           <h1 className="text-2xl font-semibold text-neutral-900">
             Owner Console
           </h1>
-          <div className="text-sm text-neutral-600">
-            Signed in as {admin.displayName}
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-neutral-600">
+              Signed in as {admin.displayName}
+            </div>
+            <LogoutButton />
           </div>
         </div>
 

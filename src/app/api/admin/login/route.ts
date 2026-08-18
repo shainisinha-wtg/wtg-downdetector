@@ -1,18 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword } from "@/modules/auth/password";
-import { createSession } from "@/modules/auth/session";
+import { createSession, getAdminCookieOptions } from "@/modules/auth/session";
 import { ADMIN_COOKIE_NAME } from "@/modules/auth/require-admin";
+import { loginRateLimiter } from "@/modules/auth/login-rate-limiter";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract IP for rate limiting (assumes trusted ingress)
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0] ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+
+    // Check rate limit
+    if (loginRateLimiter.isLimited(ip)) {
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const { username, password } = body;
 
     if (!username || !password) {
       return NextResponse.json(
         { error: "Invalid credentials" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -24,7 +39,7 @@ export async function POST(request: NextRequest) {
     if (!account || !account.enabled) {
       return NextResponse.json(
         { error: "Invalid credentials" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -43,7 +58,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         { error: "Invalid credentials" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -61,20 +76,16 @@ export async function POST(request: NextRequest) {
 
     // Set secure HTTP-only cookie
     const response = NextResponse.json({ success: true });
-    response.cookies.set(ADMIN_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      expires: expiresAt,
-      path: "/",
-    });
+    response.cookies.set(
+      ADMIN_COOKIE_NAME,
+      token,
+      getAdminCookieOptions(expiresAt),
+    );
 
     return response;
-  } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Invalid credentials" },
-      { status: 401 }
-    );
+  } catch {
+    // Sanitized error logging - no sensitive data
+    console.error("Login error occurred");
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 }

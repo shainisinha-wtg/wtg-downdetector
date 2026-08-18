@@ -1,16 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
-import { IssueType } from "@prisma/client";
-import { requireAdmin } from "@/modules/auth/require-admin";
+import { requireAdmin, ADMIN_COOKIE_NAME } from "@/modules/auth/require-admin";
+import { revokeSession } from "@/modules/auth/session";
+import {
+  retryFailedNotification,
+  updateServiceConfiguration,
+} from "@/modules/admin/owner-management";
 import {
   acknowledgeIncident,
   publishIncidentUpdate,
   resolveIncident,
   InvalidTransitionError,
 } from "@/modules/incidents/incident-management";
-import { prisma } from "@/lib/db";
 
 // Validation schemas
 const updateServiceSchema = z.object({
@@ -40,6 +45,25 @@ const retryNotificationSchema = z.object({
 });
 
 /**
+ * Logout: revoke session and delete cookie
+ */
+export async function logout() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+
+  if (token) {
+    try {
+      await revokeSession(token);
+    } catch {
+      console.error("Session revocation failed during logout");
+    }
+  }
+
+  cookieStore.delete(ADMIN_COOKIE_NAME);
+  redirect("/admin/login");
+}
+
+/**
  * Update service configuration
  */
 export async function updateService(data: unknown) {
@@ -48,31 +72,7 @@ export async function updateService(data: unknown) {
   try {
     const validated = updateServiceSchema.parse(data);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.service.update({
-        where: { id: validated.serviceId },
-        data: {
-          thresholdCount: validated.thresholdCount,
-          thresholdWindowMinutes: validated.thresholdWindowMinutes,
-          ownerEmail: validated.ownerEmail,
-          issueTypes: validated.issueTypes as IssueType[],
-        },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          accountId: admin.id,
-          action: "SERVICE_UPDATED",
-          entityType: "SERVICE",
-          entityId: validated.serviceId,
-          metadata: {
-            thresholdCount: validated.thresholdCount,
-            thresholdWindowMinutes: validated.thresholdWindowMinutes,
-            ownerEmail: validated.ownerEmail,
-          },
-        },
-      });
-    });
+    await updateServiceConfiguration(validated, admin.id);
 
     revalidatePath("/admin");
     revalidatePath("/admin/services");
@@ -83,7 +83,7 @@ export async function updateService(data: unknown) {
     if (error instanceof z.ZodError) {
       return { error: "Validation failed: " + error.errors.map(e => e.message).join(", ") };
     }
-    console.error("Update service error:", error);
+    console.error("Service update failed");
     return { error: "Failed to update service" };
   }
 }
@@ -110,7 +110,7 @@ export async function acknowledgeIncidentAction(data: unknown) {
     if (error instanceof z.ZodError) {
       return { error: "Validation failed" };
     }
-    console.error("Acknowledge incident error:", error);
+    console.error("Acknowledge incident failed");
     return { error: "Failed to acknowledge incident" };
   }
 }
@@ -141,7 +141,7 @@ export async function publishIncidentUpdateAction(data: unknown) {
     if (error instanceof z.ZodError) {
       return { error: error.errors[0].message };
     }
-    console.error("Publish update error:", error);
+    console.error("Publish update failed");
     return { error: "Failed to publish update" };
   }
 }
@@ -172,7 +172,7 @@ export async function resolveIncidentAction(data: unknown) {
     if (error instanceof z.ZodError) {
       return { error: error.errors[0].message };
     }
-    console.error("Resolve incident error:", error);
+    console.error("Resolve incident failed");
     return { error: "Failed to resolve incident" };
   }
 }
@@ -186,40 +186,7 @@ export async function retryNotification(data: unknown) {
   try {
     const validated = retryNotificationSchema.parse(data);
 
-    await prisma.$transaction(async (tx) => {
-      const job = await tx.notificationJob.findUnique({
-        where: { id: validated.jobId },
-      });
-
-      if (!job) {
-        throw new Error("Notification job not found");
-      }
-
-      if (job.state !== "FAILED") {
-        throw new Error("Can only retry failed notifications");
-      }
-
-      await tx.notificationJob.update({
-        where: { id: validated.jobId },
-        data: {
-          state: "PENDING",
-          nextAttempt: new Date(),
-          lastError: null,
-        },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          accountId: admin.id,
-          action: "NOTIFICATION_RETRY",
-          entityType: "NOTIFICATION_JOB",
-          entityId: validated.jobId,
-          metadata: {
-            jobId: validated.jobId,
-          },
-        },
-      });
-    });
+    await retryFailedNotification(validated.jobId, admin.id);
 
     revalidatePath("/admin");
     revalidatePath("/admin/services");
@@ -229,7 +196,7 @@ export async function retryNotification(data: unknown) {
     if (error instanceof z.ZodError) {
       return { error: "Validation failed" };
     }
-    console.error("Retry notification error:", error);
+    console.error("Notification retry failed");
     return { error: error instanceof Error ? error.message : "Failed to retry notification" };
   }
 }
