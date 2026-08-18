@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 interface ReportDialogProps {
@@ -42,8 +42,79 @@ export function ReportDialog({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
   const selectedService = services.find((s) => s.id === formState.serviceId);
   const availableIssueTypes = selectedService?.issueTypes ?? [];
+
+  // Escape key handler
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [isOpen, onClose]);
+
+  // Focus management
+  useEffect(() => {
+    if (isOpen) {
+      // Save current focus
+      previousFocusRef.current = document.activeElement as HTMLElement;
+
+      // Move focus into dialog
+      setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 0);
+
+      // Return cleanup to restore focus
+      return () => {
+        if (previousFocusRef.current) {
+          previousFocusRef.current.focus();
+        }
+      };
+    }
+  }, [isOpen]);
+
+  // Focus trap
+  useEffect(() => {
+    const handleTab = (e: KeyboardEvent) => {
+      if (!isOpen || e.key !== "Tab" || !dialogRef.current) return;
+
+      const focusableElements = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey) {
+        // Shift+Tab: if at first element, wrap to last
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        // Tab: if at last element, wrap to first
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleTab);
+      return () => document.removeEventListener("keydown", handleTab);
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +136,9 @@ export function ReportDialog({
 
       if (!response.ok || !data.ok) {
         if (data.code === "DUPLICATE_REPORT") {
-          setError("You've already reported this service recently. Please try again later.");
+          setError(
+            "You've already reported this service recently. Please try again later.",
+          );
         } else if (data.code === "RATE_LIMITED") {
           setError("Too many reports. Please try again in a moment.");
         } else {
@@ -91,8 +164,18 @@ export function ReportDialog({
 
   if (success) {
     return (
-      <div className="dialog-overlay" data-testid="report-dialog">
-        <div className="dialog-content" role="dialog" aria-modal="true" aria-labelledby="report-success-title">
+      <div
+        className="dialog-overlay"
+        data-testid="report-dialog"
+        onClick={onClose}
+      >
+        <div
+          className="dialog-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-success-title"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="success-message" data-testid="report-receipt">
             <h2 id="report-success-title">Report submitted</h2>
             <p>Thank you for reporting. We&apos;ll notify the service team.</p>
@@ -103,11 +186,23 @@ export function ReportDialog({
   }
 
   return (
-    <div className="dialog-overlay" data-testid="report-dialog">
-      <div className="dialog-content" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title">
+    <div
+      className="dialog-overlay"
+      data-testid="report-dialog"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        className="dialog-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="report-dialog-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="dialog-header">
           <h2 id="report-dialog-title">Report a problem</h2>
           <button
+            ref={closeButtonRef}
             className="close-button"
             onClick={onClose}
             aria-label="Close dialog"
@@ -124,7 +219,11 @@ export function ReportDialog({
               id="service"
               value={formState.serviceId}
               onChange={(e) =>
-                setFormState({ ...formState, serviceId: e.target.value, issueType: "" })
+                setFormState({
+                  ...formState,
+                  serviceId: e.target.value,
+                  issueType: "",
+                })
               }
               required
               data-testid="service-select"
@@ -164,7 +263,9 @@ export function ReportDialog({
             <textarea
               id="note"
               value={formState.note}
-              onChange={(e) => setFormState({ ...formState, note: e.target.value })}
+              onChange={(e) =>
+                setFormState({ ...formState, note: e.target.value })
+              }
               maxLength={500}
               rows={3}
               placeholder="Additional details..."
@@ -174,7 +275,11 @@ export function ReportDialog({
           </div>
 
           {error && (
-            <div className="error-message" role="alert" data-testid="error-message">
+            <div
+              className="error-message"
+              role="alert"
+              data-testid="error-message"
+            >
               {error}
             </div>
           )}
@@ -191,7 +296,9 @@ export function ReportDialog({
             <button
               type="submit"
               className="button-primary"
-              disabled={isSubmitting || !formState.serviceId || !formState.issueType}
+              disabled={
+                isSubmitting || !formState.serviceId || !formState.issueType
+              }
               data-testid="submit-report"
             >
               {isSubmitting ? "Submitting..." : "Submit report"}

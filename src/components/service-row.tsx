@@ -1,4 +1,5 @@
 import { HourlyReportBucket } from "@/modules/services/service-queries";
+import { StatusBadge } from "./status-badge";
 
 interface ServiceRowProps {
   name: string;
@@ -67,30 +68,5 @@ export function ServiceRow({
         Report a problem
       </button>
     </div>
-  );
-}
-
-function StatusBadge({ state }: { state: string }) {
-  const config: Record<string, { label: string; className: string }> = {
-    OPERATIONAL: {
-      label: "Operational",
-      className: "badge-green",
-    },
-    REPORTS_RISING: {
-      label: "Reports rising",
-      className: "badge-amber",
-    },
-    INCIDENT_CONFIRMED: {
-      label: "Incident confirmed",
-      className: "badge-red",
-    },
-  };
-
-  const { label, className } = config[state] || config.OPERATIONAL;
-
-  return (
-    <span className={`status-badge ${className}`} role="status" aria-label={label}>
-      {label}
-    </span>
   );
 }

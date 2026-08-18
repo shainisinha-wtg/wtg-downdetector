@@ -54,12 +54,12 @@ export interface ServiceDetailData {
 }
 
 /**
- * Get 24 hourly report buckets for a service.
+ * Get 24 hourly report buckets for a service using SQL aggregation.
  * Each bucket contains the count of distinct reporters in that hour.
  */
 async function getHourlyBuckets(
   serviceId: string,
-  prisma: PrismaClient
+  prisma: PrismaClient,
 ): Promise<HourlyReportBucket[]> {
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -68,7 +68,7 @@ async function getHourlyBuckets(
   const buckets: HourlyReportBucket[] = [];
   for (let i = 0; i < 24; i++) {
     const hourStart = new Date(
-      twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000
+      twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000,
     );
     buckets.push({
       hour: hourStart.toISOString(),
@@ -76,34 +76,32 @@ async function getHourlyBuckets(
     });
   }
 
-  // Get reports in the last 24 hours
-  const reports = await prisma.report.findMany({
-    where: {
-      serviceId,
-      reportedAt: {
-        gte: twentyFourHoursAgo,
-      },
-    },
-    select: {
-      reportedAt: true,
-      reporterTokenHmac: true,
-    },
-  });
+  // Use SQL aggregation to count distinct reporters per hour
+  const hourlyData = await prisma.$queryRaw<
+    Array<{ hour: Date; count: bigint }>
+  >`
+    SELECT
+      DATE_TRUNC('hour', "reportedAt") as hour,
+      COUNT(DISTINCT "reporterTokenHmac") as count
+    FROM "Report"
+    WHERE "serviceId" = ${serviceId}::uuid
+      AND "reportedAt" >= ${twentyFourHoursAgo}
+    GROUP BY DATE_TRUNC('hour', "reportedAt")
+    ORDER BY hour
+  `;
 
-  // Count distinct reporters per hour bucket
+  // Map aggregated data to buckets
+  const hourlyMap = new Map(
+    hourlyData.map((row) => [
+      new Date(row.hour).toISOString().slice(0, 13), // Truncate to hour precision
+      Number(row.count),
+    ]),
+  );
+
+  // Fill in the counts for each bucket
   for (const bucket of buckets) {
-    const hourStart = new Date(bucket.hour);
-    const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
-
-    const distinctReporters = new Set(
-      reports
-        .filter(
-          (r) => r.reportedAt >= hourStart && r.reportedAt < hourEnd
-        )
-        .map((r) => r.reporterTokenHmac)
-    );
-
-    bucket.count = distinctReporters.size;
+    const hourKey = bucket.hour.slice(0, 13);
+    bucket.count = hourlyMap.get(hourKey) || 0;
   }
 
   return buckets;
@@ -115,7 +113,7 @@ async function getHourlyBuckets(
 async function getIssueBreakdown(
   serviceId: string,
   windowMinutes: number,
-  prisma: PrismaClient
+  prisma: PrismaClient,
 ): Promise<IssueBreakdown[]> {
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMinutes * 60 * 1000);
@@ -142,7 +140,7 @@ async function getIssueBreakdown(
  */
 async function getLatestOwnerUpdate(
   serviceId: string,
-  prisma: PrismaClient
+  prisma: PrismaClient,
 ): Promise<{ message: string; updatedAt: Date } | null> {
   const latestUpdate = await prisma.incidentUpdate.findFirst({
     where: {
@@ -172,9 +170,10 @@ async function getLatestOwnerUpdate(
 
 /**
  * Get list of all enabled services with current state and sparkline data.
+ * Uses concurrent queries via Promise.all for improved performance.
  */
 export async function getServiceList(
-  prismaClient?: PrismaClient
+  prismaClient?: PrismaClient,
 ): Promise<ServiceListItem[]> {
   const prisma = prismaClient || (await import("@/lib/db")).prisma;
 
@@ -183,14 +182,15 @@ export async function getServiceList(
     orderBy: { name: "asc" },
   });
 
-  const result: ServiceListItem[] = [];
+  // Execute all per-service queries concurrently
+  const serviceDataPromises = services.map(async (service) => {
+    const [stateInfo, hourlyBuckets, latestUpdate] = await Promise.all([
+      getServiceState(service.id, prisma),
+      getHourlyBuckets(service.id, prisma),
+      getLatestOwnerUpdate(service.id, prisma),
+    ]);
 
-  for (const service of services) {
-    const stateInfo = await getServiceState(service.id, prisma);
-    const hourlyBuckets = await getHourlyBuckets(service.id, prisma);
-    const latestUpdate = await getLatestOwnerUpdate(service.id, prisma);
-
-    result.push({
+    return {
       id: service.id,
       name: service.name,
       slug: service.slug,
@@ -202,10 +202,10 @@ export async function getServiceList(
       hourlyBuckets,
       latestOwnerUpdate: latestUpdate?.message || null,
       latestOwnerUpdateAt: latestUpdate?.updatedAt || null,
-    });
-  }
+    };
+  });
 
-  return result;
+  return Promise.all(serviceDataPromises);
 }
 
 /**
@@ -213,7 +213,7 @@ export async function getServiceList(
  */
 export async function getServiceDetail(
   slug: string,
-  prismaClient?: PrismaClient
+  prismaClient?: PrismaClient,
 ): Promise<ServiceDetailData | null> {
   const prisma = prismaClient || (await import("@/lib/db")).prisma;
 
@@ -228,7 +228,7 @@ export async function getServiceDetail(
   const issueBreakdown = await getIssueBreakdown(
     service.id,
     service.thresholdWindowMinutes,
-    prisma
+    prisma,
   );
   const latestUpdate = await getLatestOwnerUpdate(service.id, prisma);
 
@@ -287,7 +287,7 @@ export async function getServiceDetail(
       reportCount: incident.reportCountAtOpening,
       latestUpdate: incident.updates[0]?.note || null,
       latestUpdateAt: incident.updates[0]?.createdAt || null,
-    })
+    }),
   );
 
   return {

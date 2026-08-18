@@ -6,15 +6,15 @@ export function StatusBadge({ state }: StatusBadgeProps) {
   const config = {
     OPERATIONAL: {
       label: "Operational",
-      className: "bg-green-100 text-green-800",
+      className: "badge-green",
     },
     REPORTS_RISING: {
       label: "Reports rising",
-      className: "bg-amber-100 text-amber-800",
+      className: "badge-amber",
     },
     INCIDENT_CONFIRMED: {
       label: "Incident confirmed",
-      className: "bg-red-100 text-red-800",
+      className: "badge-red",
     },
   };
 
@@ -22,7 +22,7 @@ export function StatusBadge({ state }: StatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex px-2 py-1 text-xs font-medium rounded ${className}`}
+      className={`status-badge ${className}`}
       role="status"
       aria-label={label}
     >

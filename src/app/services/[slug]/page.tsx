@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { getServiceDetail } from "@/modules/services/service-queries";
 import { StatusBadge } from "@/components/status-badge";
+import { ServiceReportTrigger } from "@/components/service-report-trigger";
+
+export const dynamic = "force-dynamic";
 
 interface ServicePageProps {
   params: Promise<{ slug: string }>;
@@ -41,6 +44,12 @@ export default async function ServicePage({ params }: ServicePageProps) {
             {service.reportCount} / {service.threshold} reports
           </span>
         </div>
+
+        <ServiceReportTrigger
+          serviceId={service.id}
+          serviceName={service.name}
+          issueTypes={service.issueTypes}
+        />
 
         {service.latestOwnerUpdate && (
           <div className="owner-update">

@@ -24,25 +24,27 @@ class InMemoryRateLimiter {
   /**
    * Check if an IP should be rate limited.
    * Returns true if the IP has exceeded the rate limit.
+   * Opportunistically cleans up expired entries.
    */
   isLimited(ip: string): boolean {
     const now = Date.now();
     const entry = this.limits.get(ip);
 
-    if (!entry) {
+    // Opportunistic cleanup: remove expired entry for this IP
+    if (entry && now > entry.resetAt) {
+      this.limits.delete(ip);
+    }
+
+    const currentEntry = this.limits.get(ip);
+
+    if (!currentEntry) {
       this.limits.set(ip, { count: 1, resetAt: now + this.windowMs });
       return false;
     }
 
-    if (now > entry.resetAt) {
-      // Window expired, reset
-      this.limits.set(ip, { count: 1, resetAt: now + this.windowMs });
-      return false;
-    }
+    currentEntry.count++;
 
-    entry.count++;
-
-    if (entry.count > this.maxRequests) {
+    if (currentEntry.count > this.maxRequests) {
       return true;
     }
 
@@ -52,13 +54,19 @@ class InMemoryRateLimiter {
   /**
    * Get the time when the limit will reset for an IP.
    * Returns null if no limit is active.
+   * Opportunistically cleans up expired entries.
    */
   getResetTime(ip: string): Date | null {
+    const now = Date.now();
     const entry = this.limits.get(ip);
+
     if (!entry) return null;
 
-    const now = Date.now();
-    if (now > entry.resetAt) return null;
+    // Opportunistic cleanup: remove expired entry
+    if (now > entry.resetAt) {
+      this.limits.delete(ip);
+      return null;
+    }
 
     return new Date(entry.resetAt);
   }
@@ -72,6 +80,9 @@ class InMemoryRateLimiter {
 
   /**
    * Cleanup expired entries to prevent memory growth.
+   * Manual cleanup method - opportunistic cleanup occurs during isLimited/getResetTime.
+   * Production deployments should use distributed rate limiting (Redis, ingress-level)
+   * instead of this in-memory limiter.
    */
   cleanup(): void {
     const now = Date.now();
@@ -83,16 +94,15 @@ class InMemoryRateLimiter {
   }
 }
 
-// Global instance for single-pod deployment
-// In production with multiple pods, use distributed rate limiting at ingress (nginx, etc.)
+/**
+ * Global instance for single-pod deployment.
+ *
+ * IMPORTANT: This in-memory limiter is suitable for development only.
+ * Production requires distributed rate limiting:
+ * - Use Redis-backed rate limiting for multi-pod deployments
+ * - Or configure ingress-level rate limiting (nginx, API gateway)
+ *
+ * Memory is bounded through opportunistic cleanup in isLimited/getResetTime.
+ * Call cleanup() manually if needed, or use test-only reset().
+ */
 export const reportRateLimiter = new InMemoryRateLimiter(5, 60_000); // 5 requests per minute
-
-// Periodic cleanup (run every 5 minutes)
-if (typeof setInterval !== "undefined") {
-  setInterval(
-    () => {
-      reportRateLimiter.cleanup();
-    },
-    5 * 60 * 1000
-  );
-}

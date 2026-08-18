@@ -17,11 +17,7 @@ export async function GET(
     }
 
     return NextResponse.json(service);
-  } catch (error) {
-    console.error("Failed to fetch service:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch service" },
-      { status: 500 }
-    );
+  } catch {
+      return NextResponse.json({ error: "Failed to fetch service" }, { status: 500 });
   }
 }
