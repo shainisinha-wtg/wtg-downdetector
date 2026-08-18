@@ -2,6 +2,7 @@ import { requireAdmin } from "@/modules/auth/require-admin";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { AdminShell } from "@/components/admin-shell";
+import { RefreshButton } from "@/components/refresh-button";
 
 export default async function AdminDashboardPage() {
   const admin = await requireAdmin();
@@ -54,9 +55,12 @@ export default async function AdminDashboardPage() {
       title="Owner Console"
       description={`Signed in as ${admin.displayName}`}
       actions={
-        <Link href="/admin/services" className="button-primary">
-          Manage Services
-        </Link>
+        <>
+          <RefreshButton label="Refresh Owner Console" />
+          <Link href="/admin/services" className="button-primary">
+            Manage Services
+          </Link>
+        </>
       }
     >
       <div className="admin-summary-grid">

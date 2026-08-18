@@ -19,20 +19,17 @@ Generate local credentials in the current shell. Do not commit these values:
 export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
 export REPORTER_HMAC_SECRET="$(openssl rand -hex 32)"
 export SESSION_SECRET="$(openssl rand -hex 32)"
+# Keep false for the local HTTP Compose app; set true behind HTTPS.
+# export COOKIE_SECURE=true
 # Optional when port 3000 is already in use:
 # export WEB_PORT=3001
 ```
 
-Build the image, start PostgreSQL, apply migrations, and start the web application:
+Build the image, start PostgreSQL, apply migrations, seed the default catalog and
+`admin` / `admin` owner account, and start the web application:
 
 ```bash
 docker compose up --build -d web
-```
-
-Seed the default Jira, Bitbucket, and VPN service catalog:
-
-```bash
-docker compose run --rm web node dist/seed.cjs
 ```
 
 WTG Downdetector is then available at <http://localhost:3000>. The owner login is at <http://localhost:3000/admin/login> with username `admin` and password `admin`.
@@ -55,13 +52,16 @@ Apply pending Prisma migrations explicitly with:
 docker compose run --rm migrate
 ```
 
-Re-run the idempotent catalog seed with:
+The Compose stack runs the idempotent seed automatically after migrations and
+before the web service starts. To re-run it manually:
 
 ```bash
-docker compose run --rm web node dist/seed.cjs
+docker compose run --rm seed
 ```
 
 The Compose stack uses PostgreSQL 16 and persists data in the `postgres-data` volume. `DATABASE_URL` and `DIRECT_URL` are assembled inside Compose from `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
+
+The local Compose stack defaults `COOKIE_SECURE` to `false` because it serves HTTP on localhost. Set `COOKIE_SECURE=true` when deploying behind HTTPS.
 
 ## Notification Worker
 
@@ -136,7 +136,17 @@ npm run lint
 npm run build
 ```
 
-Integration tests require a migrated PostgreSQL database through `DATABASE_URL` and `DIRECT_URL`. They run with one worker because their cleanup shares database tables.
+Integration tests require a migrated, dedicated PostgreSQL test database through `TEST_DATABASE_URL`. The test runner maps that URL to `DATABASE_URL` and `DIRECT_URL`; it refuses to start when `TEST_DATABASE_URL` is missing so test cleanup cannot modify the application database. They run with one worker because their cleanup shares database tables.
+
+For example:
+
+```bash
+export TEST_DATABASE_URL="postgresql://wtg:wtg_local_test@127.0.0.1:55432/wtg_downdetector"
+export DATABASE_URL="$TEST_DATABASE_URL"
+export DIRECT_URL="$TEST_DATABASE_URL"
+npx prisma migrate deploy
+npm run test:integration -- --run
+```
 
 Playwright covers the employee reporting and owner incident journeys in desktop Chromium and a Pixel 7 viewport. On Linux hosts without Playwright browser libraries, run it in the official image:
 

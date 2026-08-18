@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { ServiceRow } from "./service-row";
 import { ReportDialog } from "./report-dialog";
+import { RefreshButton } from "./refresh-button";
 import { ServiceListItem } from "@/modules/services/service-queries";
 
 type ServiceDashboardProps = Readonly<{
@@ -79,6 +80,7 @@ export function ServiceDashboard({ services }: ServiceDashboardProps) {
           </p>
         </div>
         <div className="dashboard-header__actions">
+          <RefreshButton label="Refresh service status" />
           <div className="dashboard-clock" aria-live="off">
             <span className="dashboard-clock__label">Local time</span>
             <strong suppressHydrationWarning>

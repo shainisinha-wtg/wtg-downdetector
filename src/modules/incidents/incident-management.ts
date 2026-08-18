@@ -169,6 +169,10 @@ export async function resolveIncident(
       },
     });
 
+    await tx.reporterCooldown.deleteMany({
+      where: { serviceId: incident.serviceId },
+    });
+
     // Create final employee-visible update
     await tx.incidentUpdate.create({
       data: {

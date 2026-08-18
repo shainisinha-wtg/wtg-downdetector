@@ -30,6 +30,15 @@ services:
         condition: service_healthy
     restart: "no"
 
+  seed:
+    build: .
+    command: ["node", "dist/seed.cjs"]
+    environment: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   web:
     build: .
     ports:
@@ -38,8 +47,9 @@ services:
       <<: *app-environment
       REPORTER_HMAC_SECRET: ${REPORTER_HMAC_SECRET:?set REPORTER_HMAC_SECRET}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
     restart: unless-stopped
 

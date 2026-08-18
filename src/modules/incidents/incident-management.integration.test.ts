@@ -8,6 +8,10 @@ import {
   InvalidTransitionError,
 } from "./incident-management";
 import { evaluateService } from "./incident-detector";
+import { submitReport } from "../reports/report-intake";
+import { generateReporterToken, hashReporterToken } from "../reports/reporter-token";
+
+const REPORTER_HMAC_SECRET = "test-secret-with-at-least-32-bytes-for-hmac";
 
 describe("Incident Management Integration", () => {
   let service: { id: string };
@@ -120,6 +124,51 @@ describe("Incident Management Integration", () => {
       await expect(
         acknowledgeIncident(incident.id, adminAccount.id)
       ).rejects.toThrow(InvalidTransitionError);
+    });
+  });
+
+  describe("Incident resolution", () => {
+    it("clears reporter cooldowns so a recurrence can be reported", async () => {
+      const token = generateReporterToken();
+      const tokenHmac = hashReporterToken(token, REPORTER_HMAC_SECRET);
+      const incident = await prisma.incident.create({
+        data: {
+          serviceId: service.id,
+          state: "OPEN",
+          thresholdCountSnapshot: 5,
+          thresholdWindowSnapshot: 10,
+          reportCountAtOpening: 5,
+        },
+      });
+
+      await prisma.reporterCooldown.create({
+        data: {
+          serviceId: service.id,
+          reporterTokenHmac: tokenHmac,
+          lastReportedAt: new Date(),
+        },
+      });
+
+      await resolveIncident(incident.id, adminAccount.id, "Service restored");
+
+      await expect(
+        prisma.reporterCooldown.findUnique({
+          where: {
+            serviceId_reporterTokenHmac: {
+              serviceId: service.id,
+              reporterTokenHmac: tokenHmac,
+            },
+          },
+        })
+      ).resolves.toBeNull();
+
+      await expect(
+        submitReport(
+          { serviceId: service.id, issueType: "UNAVAILABLE" },
+          token,
+          REPORTER_HMAC_SECRET
+        )
+      ).resolves.toBeDefined();
     });
   });
 

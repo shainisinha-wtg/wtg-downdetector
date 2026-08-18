@@ -76,6 +76,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--color-line); border-radius: 6px; color: var(--color-teal); background: var(--color-surface); cursor: pointer; }
 .icon-button:hover { border-color: var(--color-teal); background: #edf5f2; }
 .icon-text-button { display: inline-flex; align-items: center; gap: 7px; }
+.refresh-button__icon--spinning { animation: refresh-spin 0.8s linear infinite; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
 
 .dialog-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 50; padding: var(--spacing-md); background: rgb(23 32 31 / 52%); }
 .dialog-content { width: min(500px, 100%); max-height: 90vh; padding: var(--spacing-lg); border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); box-shadow: 0 20px 50px rgb(23 32 31 / 22%); overflow-y: auto; }
@@ -130,6 +132,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .admin-shell-header a { color: var(--color-teal); text-decoration: none; }
 .admin-shell-header a:hover { color: var(--color-teal-dark); }
 .admin-shell-content { max-width: 1024px; margin: 0 auto; padding: 32px 24px 48px; }
+.admin-shell-masthead { position: relative; padding-right: 220px; }
 .admin-shell-masthead h1 { color: var(--color-ink); }
 .admin-shell-masthead p { color: var(--color-muted); }
 
@@ -174,7 +177,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 /* button-secondary disabled state */
 .button-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.admin-shell-actions { margin-top: var(--spacing-md); }
+.admin-shell-actions { position: absolute; top: 0; right: 0; display: flex; gap: var(--spacing-sm); }
 
 /* Owner incident detail */
 .incident-detail { display: grid; gap: var(--spacing-lg); }
@@ -219,7 +222,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 @media (max-width: 700px) {
   .admin-summary-grid { grid-template-columns: 1fr; }
-  .admin-shell-actions { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+  .admin-shell-masthead { padding-right: 0; }
+  .admin-shell-actions { position: static; display: flex; flex-direction: column; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
   .admin-shell-actions .button-primary { width: 100%; }
   .admin-shell-content { padding: 24px 20px 40px; }
   .incident-overview__header { align-items: stretch; flex-direction: column; }

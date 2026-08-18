@@ -8,6 +8,10 @@ import { ServiceListItem } from "@/modules/services/service-queries";
 // Mock fetch
 global.fetch = vi.fn();
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 const mockServices: ServiceListItem[] = [
   {
     id: "1",
@@ -81,6 +85,14 @@ describe("ServiceDashboard", () => {
     render(<ServiceDashboard services={mockServices} />);
 
     expect(screen.getByText("3 services monitored")).toBeVisible();
+  });
+
+  it("renders a refresh control in the service status header", () => {
+    render(<ServiceDashboard services={mockServices} />);
+
+    expect(
+      screen.getByRole("button", { name: "Refresh service status" })
+    ).toBeVisible();
   });
 
   it("searches for 'jira' and finds one service", async () => {

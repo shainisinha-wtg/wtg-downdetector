@@ -6,14 +6,13 @@ const SESSION_DURATION_HOURS = 8;
 /**
  * Get secure cookie options for admin session cookies.
  *
- * IMPORTANT: Secure flag is only disabled in test environment to allow automated
- * HTTP-based route testing. Production and development environments must use HTTPS.
- * This is an explicit test-only exemption, not a runtime security trade-off.
+ * Local Compose runs over HTTP, so it explicitly opts out through COOKIE_SECURE.
+ * All other environments keep secure cookies by default.
  */
 export function getAdminCookieOptions(expiresAt: Date) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV !== "test",
+    secure: process.env.NODE_ENV !== "test" && process.env.COOKIE_SECURE !== "false",
     sameSite: "lax" as const,
     expires: expiresAt,
     path: "/",
