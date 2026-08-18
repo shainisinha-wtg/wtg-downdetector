@@ -1,4 +1,3 @@
-import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import {
@@ -75,7 +74,7 @@ function logOutcome(
   );
 }
 
-async function main() {
+export async function startWorker() {
   const config = workerEnvironmentSchema.parse(process.env);
   const sendEmail = createSmtpSender();
   let stopping = false;
@@ -106,14 +105,4 @@ async function main() {
   } finally {
     await prisma.$disconnect();
   }
-}
-
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
-  main().catch(() => {
-    console.error("Notification worker stopped because of a fatal error");
-    process.exitCode = 1;
-  });
 }

@@ -1,9 +1,20 @@
-import { PrismaClient, IncidentState, IssueType } from "@prisma/client";
+import {
+  IncidentState,
+  IncidentUpdateType,
+  IssueType,
+  PrismaClient,
+} from "@prisma/client";
 import { getServiceState } from "../incidents/incident-detector";
 
 export interface HourlyReportBucket {
   hour: string; // ISO timestamp for start of hour
   count: number;
+}
+
+export interface OwnerUpdate {
+  message: string;
+  updatedAt: Date;
+  updateType: IncidentUpdateType;
 }
 
 export interface IssueBreakdown {
@@ -34,6 +45,7 @@ export interface ServiceListItem {
   hourlyBuckets: HourlyReportBucket[];
   latestOwnerUpdate: string | null;
   latestOwnerUpdateAt: Date | null;
+  ownerUpdates: OwnerUpdate[];
 }
 
 export interface ServiceDetailData {
@@ -138,34 +150,55 @@ async function getIssueBreakdown(
 /**
  * Get latest owner update from most recent incident.
  */
-async function getLatestOwnerUpdate(
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+async function getOwnerUpdates(
   serviceId: string,
   prisma: PrismaClient,
-): Promise<{ message: string; updatedAt: Date } | null> {
-  const latestUpdate = await prisma.incidentUpdate.findFirst({
+): Promise<OwnerUpdate[]> {
+  const activeIncident = await prisma.incident.findFirst({
     where: {
-      incident: {
-        serviceId,
-      },
-      updateType: {
-        in: ["ACKNOWLEDGED", "RESOLVED", "NOTE"],
-      },
+      serviceId,
+      state: { in: [IncidentState.OPEN, IncidentState.ACKNOWLEDGED] },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      note: true,
-      createdAt: true,
-    },
+    orderBy: { openedAt: "desc" },
+    select: { id: true, resolvedAt: true },
   });
 
-  if (!latestUpdate || !latestUpdate.note) return null;
+  const incident = activeIncident ?? (await prisma.incident.findFirst({
+    where: { serviceId, state: IncidentState.RESOLVED },
+    orderBy: { resolvedAt: "desc" },
+    select: { id: true, resolvedAt: true },
+  }));
 
-  return {
-    message: latestUpdate.note,
-    updatedAt: latestUpdate.createdAt,
-  };
+  if (!incident) return [];
+
+  const isResolved = !activeIncident;
+  if (isResolved && (!incident.resolvedAt || incident.resolvedAt < startOfUtcDay(new Date()))) {
+    return [];
+  }
+
+  const updates = await prisma.incidentUpdate.findMany({
+    where: {
+      incidentId: incident.id,
+      updateType: { in: ["ACKNOWLEDGED", "RESOLVED", "NOTE"] },
+      ...(isResolved ? { updateType: "RESOLVED" } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    select: { updateType: true, note: true, createdAt: true },
+  });
+
+  return updates.flatMap((update) =>
+    update.note || update.updateType === "ACKNOWLEDGED"
+      ? [{
+          message: update.note ?? "Incident acknowledged",
+          updatedAt: update.createdAt,
+          updateType: update.updateType,
+        }]
+      : [],
+  );
 }
 
 /**
@@ -184,10 +217,10 @@ export async function getServiceList(
 
   // Execute all per-service queries concurrently
   const serviceDataPromises = services.map(async (service) => {
-    const [stateInfo, hourlyBuckets, latestUpdate] = await Promise.all([
+    const [stateInfo, hourlyBuckets, ownerUpdates] = await Promise.all([
       getServiceState(service.id, prisma),
       getHourlyBuckets(service.id, prisma),
-      getLatestOwnerUpdate(service.id, prisma),
+      getOwnerUpdates(service.id, prisma),
     ]);
 
     return {
@@ -200,8 +233,9 @@ export async function getServiceList(
       reportCount: stateInfo.count,
       threshold: service.thresholdCount,
       hourlyBuckets,
-      latestOwnerUpdate: latestUpdate?.message || null,
-      latestOwnerUpdateAt: latestUpdate?.updatedAt || null,
+      latestOwnerUpdate: ownerUpdates[0]?.message || null,
+      latestOwnerUpdateAt: ownerUpdates[0]?.updatedAt || null,
+      ownerUpdates,
     };
   });
 
@@ -230,7 +264,7 @@ export async function getServiceDetail(
     service.thresholdWindowMinutes,
     prisma,
   );
-  const latestUpdate = await getLatestOwnerUpdate(service.id, prisma);
+  const ownerUpdates = await getOwnerUpdates(service.id, prisma);
 
   // Get active incident
   const activeIncident = await prisma.incident.findFirst({
@@ -265,6 +299,7 @@ export async function getServiceDetail(
     where: {
       serviceId: service.id,
       state: IncidentState.RESOLVED,
+      resolvedAt: { gte: startOfUtcDay(new Date()) },
     },
     orderBy: { resolvedAt: "desc" },
     take: 3,
@@ -301,8 +336,8 @@ export async function getServiceDetail(
     threshold: service.thresholdCount,
     hourlyBuckets,
     issueBreakdown,
-    latestOwnerUpdate: latestUpdate?.message || null,
-    latestOwnerUpdateAt: latestUpdate?.updatedAt || null,
+    latestOwnerUpdate: ownerUpdates[0]?.message || null,
+    latestOwnerUpdateAt: ownerUpdates[0]?.updatedAt || null,
     activeIncident: activeIncidentSummary,
     recentResolvedIncidents,
   };

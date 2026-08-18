@@ -40,12 +40,22 @@ export async function getServiceState(
     now.getTime() - service.thresholdWindowMinutes * 60 * 1000
   );
 
+  const latestResolvedIncident = await prisma.incident.findFirst({
+    where: { serviceId, state: IncidentState.RESOLVED },
+    orderBy: { resolvedAt: "desc" },
+    select: { resolvedAt: true },
+  });
+  const reportWindowStart =
+    latestResolvedIncident?.resolvedAt && latestResolvedIncident.resolvedAt > windowStart
+      ? latestResolvedIncident.resolvedAt
+      : windowStart;
+
   // Count distinct reporter tokens in the rolling window
   const result = await prisma.$queryRaw<[{ count: bigint }]>`
     SELECT COUNT(DISTINCT "reporterTokenHmac") as count
     FROM "Report"
     WHERE "serviceId" = ${serviceId}::uuid
-      AND "reportedAt" >= ${windowStart}
+      AND "reportedAt" >= ${reportWindowStart}
   `;
 
   const count = Number(result[0]?.count || 0);
@@ -110,12 +120,22 @@ export async function evaluateService(
     now.getTime() - service.thresholdWindowMinutes * 60 * 1000
   );
 
+  const latestResolvedIncident = await prisma.incident.findFirst({
+    where: { serviceId, state: IncidentState.RESOLVED },
+    orderBy: { resolvedAt: "desc" },
+    select: { resolvedAt: true },
+  });
+  const reportWindowStart =
+    latestResolvedIncident?.resolvedAt && latestResolvedIncident.resolvedAt > windowStart
+      ? latestResolvedIncident.resolvedAt
+      : windowStart;
+
   // Count distinct reporter tokens in the rolling window
   const result = await prisma.$queryRaw<[{ count: bigint }]>`
     SELECT COUNT(DISTINCT "reporterTokenHmac") as count
     FROM "Report"
     WHERE "serviceId" = ${serviceId}::uuid
-      AND "reportedAt" >= ${windowStart}
+      AND "reportedAt" >= ${reportWindowStart}
   `;
 
   const count = Number(result[0]?.count || 0);

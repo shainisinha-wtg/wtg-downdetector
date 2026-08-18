@@ -1,6 +1,7 @@
 "use client";
 
 import { logout } from "@/app/admin/actions";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { useState } from "react";
 
 export function LogoutButton() {
@@ -11,7 +12,11 @@ export function LogoutButton() {
     setLoading(true);
     try {
       await logout();
-    } catch {
+    } catch (error) {
+      if (isRedirectError(error)) {
+        return;
+      }
+
       console.error("Logout failed");
       setLoading(false);
     }
@@ -19,9 +24,10 @@ export function LogoutButton() {
 
   return (
     <button
+      type="button"
       onClick={handleLogout}
       disabled={loading}
-      className="px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 rounded disabled:opacity-50"
+      className="button-secondary"
     >
       {loading ? "Logging out..." : "Logout"}
     </button>

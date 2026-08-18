@@ -24,6 +24,7 @@ const mockServices: ServiceListItem[] = [
     })),
     latestOwnerUpdate: null,
     latestOwnerUpdateAt: null,
+    ownerUpdates: [],
   },
   {
     id: "2",
@@ -40,6 +41,13 @@ const mockServices: ServiceListItem[] = [
     })),
     latestOwnerUpdate: "Investigating connectivity issues",
     latestOwnerUpdateAt: new Date(),
+    ownerUpdates: [
+      {
+        message: "Investigating connectivity issues",
+        updatedAt: new Date(),
+        updateType: "NOTE",
+      },
+    ],
   },
   {
     id: "3",
@@ -56,6 +64,7 @@ const mockServices: ServiceListItem[] = [
     })),
     latestOwnerUpdate: null,
     latestOwnerUpdateAt: null,
+    ownerUpdates: [],
   },
 ];
 
@@ -66,6 +75,12 @@ describe("ServiceDashboard", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("announces the number of monitored services", () => {
+    render(<ServiceDashboard services={mockServices} />);
+
+    expect(screen.getByText("3 services monitored")).toBeVisible();
   });
 
   it("searches for 'jira' and finds one service", async () => {
@@ -183,5 +198,31 @@ describe("ServiceDashboard", () => {
       expect(screen.getByTestId("report-receipt")).toBeInTheDocument();
       expect(screen.getByText("Report submitted")).toBeInTheDocument();
     });
+  });
+
+  it("increments a service report count after a successful report", async () => {
+    const user = userEvent.setup();
+
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        nextAllowedAt: new Date().toISOString(),
+        serviceState: "REPORTS_RISING",
+      }),
+    });
+
+    render(<ServiceDashboard services={mockServices} />);
+
+    const vpnRow = screen.getByTestId("service-row-VPN");
+    await user.click(vpnRow.querySelector(".report-button") as HTMLButtonElement);
+    await user.selectOptions(screen.getByTestId("issue-type-select"), "SLOW");
+    await user.click(screen.getByTestId("submit-report"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("report-receipt")).toBeInTheDocument();
+    });
+
+    expect(vpnRow).toHaveTextContent("6 reports");
   });
 });

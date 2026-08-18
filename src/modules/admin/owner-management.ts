@@ -5,6 +5,7 @@ export interface ServiceConfigurationCreate {
   name: string;
   slug: string;
   category: string;
+  baseUrl: string;
   thresholdCount: number;
   thresholdWindowMinutes: number;
   ownerEmail: string;
@@ -15,6 +16,7 @@ export interface ServiceConfigurationCreate {
 export interface ServiceConfigurationUpdate {
   serviceId: string;
   category: string;
+  baseUrl: string;
   thresholdCount: number;
   thresholdWindowMinutes: number;
   ownerEmail: string;
@@ -40,6 +42,7 @@ export async function createServiceConfiguration(
             name: service.name,
             slug: service.slug,
             category: service.category,
+            baseUrl: service.baseUrl,
             ownerEmail: service.ownerEmail,
             thresholdCount: service.thresholdCount,
             thresholdWindowMinutes: service.thresholdWindowMinutes,
@@ -72,6 +75,7 @@ export async function updateServiceConfiguration(
         thresholdCount: input.thresholdCount,
         thresholdWindowMinutes: input.thresholdWindowMinutes,
         ownerEmail: input.ownerEmail,
+        baseUrl: input.baseUrl,
         issueTypes: input.issueTypes,
         enabled: input.enabled,
       },
@@ -88,6 +92,7 @@ export async function updateServiceConfiguration(
             thresholdCount: oldService.thresholdCount,
             thresholdWindowMinutes: oldService.thresholdWindowMinutes,
             ownerEmail: oldService.ownerEmail,
+            baseUrl: oldService.baseUrl,
             category: oldService.category,
             enabled: oldService.enabled,
             issueTypes: oldService.issueTypes,
@@ -96,6 +101,7 @@ export async function updateServiceConfiguration(
             thresholdCount: input.thresholdCount,
             thresholdWindowMinutes: input.thresholdWindowMinutes,
             ownerEmail: input.ownerEmail,
+            baseUrl: input.baseUrl,
             category: input.category,
             enabled: input.enabled,
             issueTypes: input.issueTypes,

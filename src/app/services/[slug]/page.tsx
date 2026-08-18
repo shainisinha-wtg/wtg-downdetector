@@ -9,7 +9,7 @@ interface ServicePageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function ServicePage({ params }: ServicePageProps) {
+export default async function ServicePage({ params }: Readonly<ServicePageProps>) {
   const { slug } = await params;
   const service = await getServiceDetail(slug);
 
@@ -17,132 +17,139 @@ export default async function ServicePage({ params }: ServicePageProps) {
     notFound();
   }
 
-  const maxBucketCount = Math.max(...service.hourlyBuckets.map((b) => b.count), 1);
+  const maxBucketCount = Math.max(...service.hourlyBuckets.map((bucket) => bucket.count), 1);
 
   return (
-    <main>
-      <header>
-        <strong>WTG Downdetector</strong>
+    <>
+      <header className="site-header">
+        <div className="site-header__brand">
+          <strong>WTG Downdetector</strong>
+          <span>Internal service monitor</span>
+        </div>
+        <div className="site-header__status">
+          <span className="site-header__status-dot" aria-hidden="true" />
+          <span>Service detail</span>
+        </div>
       </header>
 
-      <article>
-        <div className="service-header">
-          <h1>{service.name}</h1>
-          <StatusBadge
-            state={
-              service.currentState as
-                | "OPERATIONAL"
-                | "REPORTS_RISING"
-                | "INCIDENT_CONFIRMED"
-            }
-          />
-        </div>
+      <main className="service-detail">
+        <article>
+          <header className="service-detail-header">
+            <div>
+              <p className="dashboard-kicker">{service.category}</p>
+              <h1>{service.name}</h1>
+            </div>
+            <StatusBadge state={service.currentState as "OPERATIONAL" | "REPORTS_RISING" | "INCIDENT_CONFIRMED"} />
+          </header>
 
-        <div className="service-meta">
-          <span className="category">{service.category}</span>
-          <span className="report-count">
-            {service.reportCount} / {service.threshold} reports
-          </span>
-        </div>
-
-        <ServiceReportTrigger
-          serviceId={service.id}
-          serviceName={service.name}
-          issueTypes={service.issueTypes}
-        />
-
-        {service.latestOwnerUpdate && (
-          <div className="owner-update">
-            <h2>Latest update</h2>
-            <p>{service.latestOwnerUpdate}</p>
-            {service.latestOwnerUpdateAt && (
-              <time dateTime={new Date(service.latestOwnerUpdateAt).toISOString()}>
-                {new Date(service.latestOwnerUpdateAt).toLocaleString()}
-              </time>
-            )}
+          <div className="service-detail-metrics">
+            <div>
+              <span>Reports in window</span>
+              <strong>{service.reportCount} / {service.threshold}</strong>
+            </div>
+            <div>
+              <span>Current status</span>
+              <strong>{service.currentState.replaceAll("_", " ")}</strong>
+            </div>
           </div>
-        )}
 
-        <section>
-          <h2>24-hour report trend</h2>
-          <div
-            className="sparkline"
-            role="img"
-            aria-label="24-hour report trend"
-          >
-            {service.hourlyBuckets.map((bucket, i) => {
-              const heightPercent =
-                maxBucketCount > 0 ? (bucket.count / maxBucketCount) * 100 : 0;
-              return (
+          <div className="service-detail-action">
+            <ServiceReportTrigger serviceId={service.id} serviceName={service.name} issueTypes={service.issueTypes} />
+          </div>
+
+          {service.latestOwnerUpdate && (
+            <section className="service-detail-section owner-update">
+              <h2>Latest update</h2>
+              <p>{service.latestOwnerUpdate}</p>
+              {service.latestOwnerUpdateAt && (
+                <time dateTime={new Date(service.latestOwnerUpdateAt).toISOString()}>
+                  {new Date(service.latestOwnerUpdateAt).toLocaleString()}
+                </time>
+              )}
+            </section>
+          )}
+
+          <section className="service-detail-section">
+            <h2>24-hour report trend</h2>
+            <div className="sparkline" role="img" aria-label="24-hour report trend">
+              {service.hourlyBuckets.map((bucket) => (
                 <div
-                  key={i}
+                  key={bucket.hour}
                   className="sparkline-bar"
-                  style={{ height: `${heightPercent}%` }}
+                  style={{ height: `${(bucket.count / maxBucketCount) * 100}%` }}
                   aria-hidden="true"
                 />
-              );
-            })}
-          </div>
-        </section>
-
-        {service.issueBreakdown.length > 0 && (
-          <section>
-            <h2>Issue breakdown</h2>
-            <ul>
-              {service.issueBreakdown.map((issue) => (
-                <li key={issue.issueType}>
-                  {formatIssueType(issue.issueType)}: {issue.count} reports
-                </li>
               ))}
-            </ul>
-          </section>
-        )}
-
-        {service.activeIncident && (
-          <section>
-            <h2>Active incident</h2>
-            <div className="incident-card">
-              <p>
-                Opened: {new Date(service.activeIncident.openedAt).toLocaleString()}
-              </p>
-              <p>Report count at opening: {service.activeIncident.reportCount}</p>
-              {service.activeIncident.latestUpdate && (
-                <div className="incident-update">
-                  <p>{service.activeIncident.latestUpdate}</p>
-                  {service.activeIncident.latestUpdateAt && (
-                    <time
-                      dateTime={new Date(
-                        service.activeIncident.latestUpdateAt
-                      ).toISOString()}
-                    >
-                      {new Date(
-                        service.activeIncident.latestUpdateAt
-                      ).toLocaleString()}
-                    </time>
-                  )}
-                </div>
-              )}
             </div>
           </section>
-        )}
 
-        {service.recentResolvedIncidents.length > 0 && (
-          <section>
-            <h2>Recent resolved incidents</h2>
-            {service.recentResolvedIncidents.map((incident) => (
-              <div key={incident.id} className="incident-card">
-                <p>
-                  Resolved:{" "}
-                  {incident.resolvedAt &&
-                    new Date(incident.resolvedAt).toLocaleString()}
-                </p>
-                {incident.latestUpdate && <p>{incident.latestUpdate}</p>}
+          {service.issueBreakdown.length > 0 && (
+            <section className="service-detail-section">
+              <h2>Issue breakdown</h2>
+              <ul className="service-detail-list">
+                {service.issueBreakdown.map((issue) => (
+                  <li key={issue.issueType}>
+                    <span>{formatIssueType(issue.issueType)}</span>
+                    <strong>{issue.count} reports</strong>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {service.activeIncident && (
+            <section className="service-detail-section">
+              <h2>Active incident</h2>
+              <IncidentCard
+                openedAt={service.activeIncident.openedAt}
+                reportCount={service.activeIncident.reportCount}
+                latestUpdate={service.activeIncident.latestUpdate}
+                latestUpdateAt={service.activeIncident.latestUpdateAt}
+              />
+            </section>
+          )}
+
+          {service.recentResolvedIncidents.length > 0 && (
+            <section className="service-detail-section">
+              <h2>Recent resolved incidents</h2>
+              <div className="service-detail-resolved">
+                {service.recentResolvedIncidents.map((incident) => (
+                  <div key={incident.id} className="service-detail-incident">
+                    <p>Resolved: {incident.resolvedAt && new Date(incident.resolvedAt).toLocaleString()}</p>
+                    {incident.latestUpdate && <p>{incident.latestUpdate}</p>}
+                  </div>
+                ))}
               </div>
-            ))}
-          </section>
-        )}
-      </article>
-    </main>
+            </section>
+          )}
+        </article>
+      </main>
+    </>
+  );
+}
+
+function IncidentCard({
+  openedAt,
+  reportCount,
+  latestUpdate,
+  latestUpdateAt,
+}: Readonly<{
+  openedAt: Date | string;
+  reportCount: number;
+  latestUpdate: string | null;
+  latestUpdateAt: Date | string | null;
+}>) {
+  return (
+    <div className="service-detail-incident">
+      <p>Opened: {new Date(openedAt).toLocaleString()}</p>
+      <p>Report count at opening: {reportCount}</p>
+      {latestUpdate && (
+        <div className="incident-update">
+          <p>{latestUpdate}</p>
+          {latestUpdateAt && <time dateTime={new Date(latestUpdateAt).toISOString()}>{new Date(latestUpdateAt).toLocaleString()}</time>}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { requireAdmin } from "@/modules/auth/require-admin";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { AdminShell } from "@/components/admin-shell";
 import {
   acknowledgeIncidentAction,
   publishIncidentUpdateAction,
@@ -10,9 +11,9 @@ import {
 
 export default async function IncidentDetailPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ id: string }>;
-}) {
+}>) {
   await requireAdmin();
   const { id } = await params;
 
@@ -44,81 +45,61 @@ export default async function IncidentDetailPage({
   const isActive = incident.state === "OPEN" || incident.state === "ACKNOWLEDGED";
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="mb-6">
-          <Link
-            href="/admin"
-            className="text-teal-600 hover:text-teal-700 text-sm font-medium"
-          >
-            ← Back to Dashboard
-          </Link>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
+    <AdminShell
+      title={incident.service.name}
+      description={`Incident opened ${new Date(incident.openedAt).toLocaleString()}`}
+      actions={
+        <Link href="/admin" className="button-secondary">
+          Back to dashboard
+        </Link>
+      }
+    >
+      <div className="incident-detail">
+        <section className="incident-overview">
+          <div className="incident-overview__header">
             <div>
-              <h1 className="text-2xl font-semibold text-neutral-900">
-                {incident.service.name}
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">
-                Opened {new Date(incident.openedAt).toLocaleString()}
-              </p>
+              <p className="dashboard-kicker">Incident overview</p>
+              <h2>{incident.service.name}</h2>
             </div>
             <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                incident.state === "OPEN"
-                  ? "bg-red-100 text-red-700"
-                  : incident.state === "ACKNOWLEDGED"
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-green-100 text-green-700"
-              }`}
+              className={`status-badge ${incidentStateBadgeClass(incident.state)}`}
             >
               {incident.state}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <dl className="incident-facts">
             <div>
-              <span className="text-neutral-600">Report Count:</span>{" "}
-              <span className="text-neutral-900 font-medium">
-                {incident.reportCountAtOpening}
-              </span>
+              <dt>Report count</dt>
+              <dd>{incident.reportCountAtOpening}</dd>
             </div>
             <div>
-              <span className="text-neutral-600">Threshold:</span>{" "}
-              <span className="text-neutral-900 font-medium">
-                {incident.thresholdCountSnapshot} reports in{" "}
-                {incident.thresholdWindowSnapshot} min
-              </span>
+              <dt>Threshold</dt>
+              <dd>
+                {incident.thresholdCountSnapshot} reports in {incident.thresholdWindowSnapshot} min
+              </dd>
             </div>
             {incident.acknowledgedAt && (
               <div>
-                <span className="text-neutral-600">Acknowledged:</span>{" "}
-                <span className="text-neutral-900">
-                  {new Date(incident.acknowledgedAt).toLocaleString()}
-                </span>
+                <dt>Acknowledged</dt>
+                <dd>{new Date(incident.acknowledgedAt).toLocaleString()}</dd>
               </div>
             )}
             {incident.resolvedAt && (
               <div>
-                <span className="text-neutral-600">Resolved:</span>{" "}
-                <span className="text-neutral-900">
-                  {new Date(incident.resolvedAt).toLocaleString()}
-                </span>
+                <dt>Resolved</dt>
+                <dd>{new Date(incident.resolvedAt).toLocaleString()}</dd>
               </div>
             )}
-          </div>
-        </div>
+          </dl>
+        </section>
 
         {/* Actions */}
         {isActive && (
-          <div className="bg-white rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-neutral-900 mb-4">
-              Actions
-            </h2>
+          <section className="incident-actions">
+            <h2>Actions</h2>
 
-            <div className="space-y-4">
+            <div className="incident-actions__stack">
               {/* Acknowledge */}
               {incident.state === "OPEN" && (
                 <form
@@ -129,7 +110,7 @@ export default async function IncidentDetailPage({
                 >
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm font-medium"
+                    className="button-secondary"
                   >
                     Acknowledge Incident
                   </button>
@@ -146,22 +127,24 @@ export default async function IncidentDetailPage({
                     note,
                   });
                 }}
-                className="space-y-2"
+                className="form-field"
               >
-                <label className="block text-sm font-medium text-neutral-700">
+                <label
+                  htmlFor="incident-update-note"
+                >
                   Publish Update
                 </label>
                 <textarea
+                  id="incident-update-note"
                   name="note"
                   rows={3}
                   maxLength={1000}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
                   placeholder="Status update for employees..."
                   required
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm font-medium"
+                  className="button-primary"
                 >
                   Publish Update
                 </button>
@@ -177,62 +160,53 @@ export default async function IncidentDetailPage({
                     finalMessage,
                   });
                 }}
-                className="space-y-2"
+                className="form-field"
               >
-                <label className="block text-sm font-medium text-neutral-700">
+                <label
+                  htmlFor="incident-resolution-message"
+                >
                   Resolve Incident
                 </label>
                 <textarea
+                  id="incident-resolution-message"
                   name="finalMessage"
                   rows={3}
                   maxLength={1000}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
                   placeholder="Final resolution message..."
                   required
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
+                  className="button-primary"
                 >
                   Resolve Incident
                 </button>
               </form>
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Updates */}
-        <div className="bg-white rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4">
-            Timeline
-          </h2>
+        <section className="incident-timeline">
+          <h2>Timeline</h2>
 
           {incident.updates.length === 0 ? (
-            <p className="text-sm text-neutral-600">No updates yet</p>
+            <p className="admin-empty-state">No updates yet</p>
           ) : (
-            <div className="space-y-4">
+            <div className="incident-timeline__list">
               {incident.updates.map((update) => (
-                <div key={update.id} className="border-l-2 border-neutral-200 pl-4">
-                  <div className="flex items-center gap-2 mb-1">
+                <div key={update.id} className="incident-timeline__item">
+                  <div className="incident-timeline__meta">
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        update.updateType === "OPENED"
-                          ? "bg-red-100 text-red-700"
-                          : update.updateType === "ACKNOWLEDGED"
-                          ? "bg-amber-100 text-amber-700"
-                          : update.updateType === "RESOLVED"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
+                      className={`status-badge ${updateTypeBadgeClass(update.updateType)}`}
                     >
                       {update.updateType}
                     </span>
-                    <span className="text-xs text-neutral-600">
+                    <span className="incident-timeline__time">
                       {new Date(update.createdAt).toLocaleString()}
                     </span>
                   </div>
                   {update.note && (
-                    <p className="text-sm text-neutral-900 mt-2">
+                    <p className="incident-timeline__note">
                       {update.note}
                     </p>
                   )}
@@ -240,8 +214,21 @@ export default async function IncidentDetailPage({
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
-    </div>
+    </AdminShell>
   );
+}
+
+function incidentStateBadgeClass(state: string): string {
+  if (state === "OPEN") return "badge-red";
+  if (state === "ACKNOWLEDGED") return "badge-amber";
+  return "badge-green";
+}
+
+function updateTypeBadgeClass(updateType: string): string {
+  if (updateType === "OPENED") return "badge-red";
+  if (updateType === "ACKNOWLEDGED") return "badge-amber";
+  if (updateType === "RESOLVED") return "badge-green";
+  return "badge-amber";
 }

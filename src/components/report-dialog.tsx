@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 interface ReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onReportSubmitted?: (serviceId: string) => void;
   services: Array<{ id: string; name: string; issueTypes: string[] }>;
   preselectedServiceId?: string;
 }
@@ -19,6 +20,7 @@ interface FormState {
 export function ReportDialog({
   isOpen,
   onClose,
+  onReportSubmitted,
   services,
   preselectedServiceId,
 }: ReportDialogProps) {
@@ -45,6 +47,7 @@ export function ReportDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedService = services.find((s) => s.id === formState.serviceId);
   const availableIssueTypes = selectedService?.issueTypes ?? [];
@@ -148,16 +151,25 @@ export function ReportDialog({
         return;
       }
 
+      onReportSubmitted?.(formState.serviceId);
       setSuccess(true);
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-        setFormState({ serviceId: "", issueType: "", note: "" });
-      }, 2000);
+      successTimeoutRef.current = setTimeout(closeAfterSuccess, 2000);
     } catch {
       setError("Network error. Please check your connection and try again.");
       setIsSubmitting(false);
     }
+  };
+
+  const closeAfterSuccess = () => {
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
+    setIsSubmitting(false);
+    setError(null);
+    setSuccess(false);
+    setFormState({ serviceId: "", issueType: "", note: "" });
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -167,7 +179,7 @@ export function ReportDialog({
       <div
         className="dialog-overlay"
         data-testid="report-dialog"
-        onClick={onClose}
+        onClick={closeAfterSuccess}
       >
         <div
           className="dialog-content"

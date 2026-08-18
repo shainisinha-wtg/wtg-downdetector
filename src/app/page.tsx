@@ -7,11 +7,20 @@ export default async function HomePage() {
   const services = await getServiceList();
 
   return (
-    <main>
-      <header>
-        <strong>WTG Downdetector</strong>
+    <>
+      <header className="site-header">
+        <div className="site-header__brand">
+          <strong>WTG Downdetector</strong>
+          <span>Internal service monitor</span>
+        </div>
+        <div className="site-header__status">
+          <span className="site-header__status-dot" aria-hidden="true" />
+          <span>Live status</span>
+        </div>
       </header>
-      <ServiceDashboard services={services} />
-    </main>
+      <main>
+        <ServiceDashboard services={services} />
+      </main>
+    </>
   );
 }

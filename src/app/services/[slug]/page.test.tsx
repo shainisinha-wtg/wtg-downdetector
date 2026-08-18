@@ -23,10 +23,10 @@ describe("ServicePage", () => {
       currentState: "OPERATIONAL",
       reportCount: 5,
       threshold: 10,
-      hourlyBuckets: Array(24).fill({
-        hour: new Date().toISOString(),
+      hourlyBuckets: Array.from({ length: 24 }, (_, index) => ({
+        hour: new Date(Date.now() - index * 60 * 60 * 1000).toISOString(),
         count: 0,
-      }),
+      })),
       issueBreakdown: [],
       latestOwnerUpdate: null,
       latestOwnerUpdateAt: null,
@@ -38,6 +38,11 @@ describe("ServicePage", () => {
     const params = Promise.resolve({ slug: "test-service" });
 
     render(await ServicePage({ params }));
+
+    expect(screen.getByText("WTG Downdetector")).toBeVisible();
+    expect(screen.getByText("Service detail")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Test Service" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "24-hour report trend" })).toBeVisible();
 
     const reportButton = screen.getByRole("button", {
       name: /report a problem/i,

@@ -21,6 +21,7 @@ import {
 // Validation schemas
 const serviceFieldsSchema = z.object({
   category: z.string().trim().min(1).max(100),
+  baseUrl: z.string().trim().max(2048),
   thresholdCount: z.number().int().min(1).max(1000),
   thresholdWindowMinutes: z.number().int().min(1).max(1440),
   ownerEmail: z.string().email(),
@@ -96,8 +97,6 @@ export async function createService(data: unknown) {
     revalidatePath("/admin");
     revalidatePath("/admin/services");
     revalidatePath("/");
-
-    return { success: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
@@ -109,6 +108,8 @@ export async function createService(data: unknown) {
     console.error("Service creation failed");
     return { error: "Failed to create service" };
   }
+
+  redirect("/admin/services");
 }
 
 /**
@@ -125,8 +126,6 @@ export async function updateService(data: unknown) {
     revalidatePath("/admin");
     revalidatePath("/admin/services");
     revalidatePath("/");
-
-    return { success: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
@@ -137,6 +136,8 @@ export async function updateService(data: unknown) {
     console.error("Service update failed");
     return { error: "Failed to update service" };
   }
+
+  redirect("/admin/services");
 }
 
 /**

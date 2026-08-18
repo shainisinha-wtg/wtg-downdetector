@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -44,6 +45,7 @@ model Service {
   name                    String
   slug                    String              @unique
   category                String
+  baseUrl                 String              @default("")
   ownerEmail              String
   thresholdCount          Int
   thresholdWindowMinutes  Int

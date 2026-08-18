@@ -292,7 +292,7 @@ describe("Incident Management Integration", () => {
   });
 
   describe("Detection disarming after resolution", () => {
-    it("keeps detector disarmed while counts remain elevated after resolution", async () => {
+    it("re-arms detector and ignores pre-resolution reports after resolution", async () => {
       // Create reports that cross threshold
       const reporterTokens = ["token1", "token2", "token3", "token4", "token5"];
       for (const token of reporterTokens) {
@@ -325,7 +325,7 @@ describe("Incident Management Integration", () => {
         "Issue resolved"
       );
 
-      // Evaluate again - detection should still be disarmed
+      // Evaluate again - pre-resolution reports should not create a new incident
       await evaluateService(service.id);
 
       incidents = await prisma.incident.findMany({
@@ -336,7 +336,7 @@ describe("Incident Management Integration", () => {
       updatedService = await prisma.service.findUnique({
         where: { id: service.id },
       });
-      expect(updatedService?.detectionArmed).toBe(false);
+      expect(updatedService?.detectionArmed).toBe(true);
     });
 
     it("re-arms detection after counts fall below threshold", async () => {

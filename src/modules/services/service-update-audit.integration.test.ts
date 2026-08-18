@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import * as argon2 from "argon2";
 import { prisma } from "@/lib/db";
-import { updateServiceConfiguration } from "@/modules/admin/owner-management";
+import {
+  updateServiceConfiguration,
+} from "@/modules/admin/owner-management";
 
 describe("Service Update Audit Integration", () => {
   let service: { id: string };
@@ -49,6 +51,7 @@ describe("Service Update Audit Integration", () => {
         thresholdCount: 10,
         thresholdWindowMinutes: 20,
         ownerEmail: "new@example.com",
+        baseUrl: "https://status.example.com",
         issueTypes: ["UNAVAILABLE", "SLOW"],
         enabled: false,
       },
@@ -80,6 +83,7 @@ describe("Service Update Audit Integration", () => {
 
     // Verify before values
     expect(before.ownerEmail).toBe("original@example.com");
+    expect(before.baseUrl).toBe("");
     expect(before.thresholdCount).toBe(5);
     expect(before.thresholdWindowMinutes).toBe(10);
     expect(before.category).toBe("Developer Tools");
@@ -88,6 +92,7 @@ describe("Service Update Audit Integration", () => {
 
     // Verify after values
     expect(after.ownerEmail).toBe("new@example.com");
+    expect(after.baseUrl).toBe("https://status.example.com");
     expect(after.thresholdCount).toBe(10);
     expect(after.thresholdWindowMinutes).toBe(20);
     expect(after.category).toBe("Business Systems");
@@ -103,6 +108,7 @@ describe("Service Update Audit Integration", () => {
         thresholdCount: 15,
         thresholdWindowMinutes: 30,
         ownerEmail: "updated@example.com",
+        baseUrl: "",
         issueTypes: ["LOGIN", "CONNECTIVITY"],
         enabled: true,
       },
@@ -124,6 +130,7 @@ describe("Service Update Audit Integration", () => {
     expect(before).toHaveProperty("thresholdCount");
     expect(before).toHaveProperty("thresholdWindowMinutes");
     expect(before).toHaveProperty("ownerEmail");
+    expect(before).toHaveProperty("baseUrl");
     expect(before).toHaveProperty("category");
     expect(before).toHaveProperty("enabled");
     expect(before).toHaveProperty("issueTypes");
@@ -131,6 +138,7 @@ describe("Service Update Audit Integration", () => {
     expect(after).toHaveProperty("thresholdCount");
     expect(after).toHaveProperty("thresholdWindowMinutes");
     expect(after).toHaveProperty("ownerEmail");
+    expect(after).toHaveProperty("baseUrl");
     expect(after).toHaveProperty("category");
     expect(after).toHaveProperty("enabled");
     expect(after).toHaveProperty("issueTypes");
@@ -151,6 +159,7 @@ describe("Service Update Audit Integration", () => {
         name: "Status Portal",
         slug: "status-portal",
         category: "Business Systems",
+        baseUrl: "",
         ownerEmail: "status@example.com",
         thresholdCount: 8,
         thresholdWindowMinutes: 15,
@@ -177,6 +186,7 @@ describe("Service Update Audit Integration", () => {
         name: "Status Portal",
         slug: "status-portal",
         category: "Business Systems",
+        baseUrl: "",
         ownerEmail: "status@example.com",
         thresholdCount: 8,
         thresholdWindowMinutes: 15,
@@ -185,4 +195,26 @@ describe("Service Update Audit Integration", () => {
       },
     });
   });
+
+  it("persists an optional base URL in an update", async () => {
+    await updateServiceConfiguration(
+      {
+        serviceId: service.id,
+        category: "Developer Tools",
+        thresholdCount: 5,
+        thresholdWindowMinutes: 10,
+        ownerEmail: "original@example.com",
+        issueTypes: ["UNAVAILABLE"],
+        enabled: true,
+        baseUrl: "https://status.example.com",
+      },
+      adminAccount.id,
+    );
+
+    const updated = await prisma.service.findUniqueOrThrow({
+      where: { id: service.id },
+    });
+    expect(updated.baseUrl).toBe("https://status.example.com");
+  });
+
 });

@@ -37,58 +37,49 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-sm">
-        <h1 className="text-2xl font-semibold mb-6 text-neutral-900">
-          Owner Console
-        </h1>
+    <div className="admin-login">
+      <div className="admin-login-card">
+        <div className="admin-login-masthead mb-6">
+          <p className="text-xs font-semibold uppercase tracking-wide mb-1">
+            WTG Downdetector
+          </p>
+          <h1 className="text-2xl font-semibold">
+            Owner operations console
+          </h1>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-neutral-700 mb-1"
-            >
-              Username
-            </label>
+        <form onSubmit={handleSubmit}>
+          <div className="form-field">
+            <label htmlFor="username">Username</label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
               required
               autoFocus
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-neutral-700 mb-1"
-            >
-              Password
-            </label>
+          <div className="form-field">
+            <label htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
               required
             />
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-              {error}
-            </div>
+            <div className="error-message">{error}</div>
           )}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2 px-4 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="button-primary w-full"
           >
             {isSubmitting ? "Signing in..." : "Sign in"}
           </button>

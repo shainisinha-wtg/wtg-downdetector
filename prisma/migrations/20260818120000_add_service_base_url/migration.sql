@@ -1,0 +1,1 @@
+ALTER TABLE "Service" ADD COLUMN "baseUrl" TEXT NOT NULL DEFAULT '';

@@ -9,13 +9,18 @@ describe("Report Intake", () => {
   let serviceId: string;
 
   beforeAll(async () => {
-    // Delete any existing test service first
-    await prisma.service.deleteMany({
+    const service = await prisma.service.upsert({
       where: { slug: "test-service" },
-    });
-
-    const service = await prisma.service.create({
-      data: {
+      update: {
+        name: "Test Service",
+        category: "Developer Tools",
+        ownerEmail: "test@example.internal",
+        thresholdCount: 3,
+        thresholdWindowMinutes: 10,
+        issueTypes: ["UNAVAILABLE", "SLOW"],
+        enabled: true,
+      },
+      create: {
         name: "Test Service",
         slug: "test-service",
         category: "Developer Tools",

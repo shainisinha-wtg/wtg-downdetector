@@ -45,6 +45,11 @@ export async function acknowledgeIncident(
       },
     });
 
+    await tx.service.update({
+      where: { id: incident.serviceId },
+      data: { detectionArmed: true },
+    });
+
     // Create employee-visible update
     await tx.incidentUpdate.create({
       data: {

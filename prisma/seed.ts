@@ -1,9 +1,27 @@
 import { PrismaClient, IssueType } from "@prisma/client";
+import { hashPassword } from "../src/modules/auth/password";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
+
+  const passwordHash = await hashPassword("admin");
+
+  await prisma.adminAccount.upsert({
+    where: { username: "admin" },
+    update: {
+      passwordHash,
+      displayName: "Admin",
+      enabled: true,
+    },
+    create: {
+      username: "admin",
+      passwordHash,
+      displayName: "Admin",
+      enabled: true,
+    },
+  });
 
   // Seed services with idempotent upsert by slug
   await prisma.service.upsert({
