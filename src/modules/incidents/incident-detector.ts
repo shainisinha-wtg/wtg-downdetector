@@ -30,7 +30,7 @@ export async function getServiceState(
 ): Promise<ServiceStateInfo> {
   const prisma = tx || (await import("@/lib/db")).prisma;
 
-  // Fetch service with FOR UPDATE lock
+  // Fetch service (read-only; no lock needed)
   const service = await prisma.service.findUniqueOrThrow({
     where: { id: serviceId },
   });
@@ -50,11 +50,11 @@ export async function getServiceState(
 
   const count = Number(result[0]?.count || 0);
 
-  // Check for open incident
+  // Check for active incident (OPEN or ACKNOWLEDGED)
   const openIncident = await prisma.incident.findFirst({
     where: {
       serviceId,
-      state: IncidentState.OPEN,
+      state: { in: [IncidentState.OPEN, IncidentState.ACKNOWLEDGED] },
     },
   });
 
@@ -120,11 +120,11 @@ export async function evaluateService(
 
   const count = Number(result[0]?.count || 0);
 
-  // Check for open incident (before locking)
+  // Check for active incident (OPEN or ACKNOWLEDGED) before locking
   const openIncident = await prisma.incident.findFirst({
     where: {
       serviceId,
-      state: IncidentState.OPEN,
+      state: { in: [IncidentState.OPEN, IncidentState.ACKNOWLEDGED] },
     },
   });
 
@@ -137,6 +137,14 @@ export async function evaluateService(
 
   // Early return if incident already exists
   if (openIncident) {
+    // Re-arm detection if count drops below threshold, even with active incident
+    if (count < service.thresholdCount && !service.detectionArmed) {
+      await prisma.service.update({
+        where: { id: serviceId },
+        data: { detectionArmed: true },
+      });
+    }
+
     return {
       incidentCreated: false,
       incidentId: openIncident.id,
@@ -183,7 +191,7 @@ export async function evaluateService(
   const doubleCheckIncident = await prisma.incident.findFirst({
     where: {
       serviceId,
-      state: IncidentState.OPEN,
+      state: { in: [IncidentState.OPEN, IncidentState.ACKNOWLEDGED] },
     },
   });
 

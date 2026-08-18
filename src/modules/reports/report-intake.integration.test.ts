@@ -176,4 +176,48 @@ describe("Report Intake", () => {
 
     expect(receipt.reportId).toBeDefined();
   });
+
+  it("serializes concurrent same-reporter submissions with advisory lock", async () => {
+    const token = generateReporterToken();
+
+    // Submit the same service/reporter token concurrently
+    const results = await Promise.allSettled([
+      submitReport(
+        {
+          serviceId,
+          issueType: "UNAVAILABLE",
+          note: "Concurrent submission 1",
+        },
+        token,
+        REPORTER_HMAC_SECRET
+      ),
+      submitReport(
+        {
+          serviceId,
+          issueType: "UNAVAILABLE",
+          note: "Concurrent submission 2",
+        },
+        token,
+        REPORTER_HMAC_SECRET
+      ),
+    ]);
+
+    // Assert exactly one fulfilled result
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    // Assert the rejection is a DuplicateReportError
+    expect(rejected[0].status).toBe("rejected");
+    if (rejected[0].status === "rejected") {
+      expect(rejected[0].reason).toBeInstanceOf(DuplicateReportError);
+      expect(rejected[0].reason.nextAllowedAt).toBeInstanceOf(Date);
+    }
+
+    // Assert exactly one Report row exists
+    const reports = await prisma.report.findMany({ where: { serviceId } });
+    expect(reports).toHaveLength(1);
+  });
 });

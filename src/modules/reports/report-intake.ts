@@ -69,7 +69,13 @@ export async function submitReport(
       const cooldownWindowMs = service.thresholdWindowMinutes * 60 * 1000;
       const nextAllowedAt = new Date(now.getTime() + cooldownWindowMs);
 
-      // Check existing cooldown
+      // Acquire transaction-scoped advisory lock to serialize concurrent submissions
+      // from the same reporter+service, even when cooldown row doesn't exist yet
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${validated.serviceId}::text || ':' || ${tokenHmac}, 0))
+      `;
+
+      // Check existing cooldown (now serialized by advisory lock)
       const existingCooldown = await tx.reporterCooldown.findUnique({
         where: {
           serviceId_reporterTokenHmac: {

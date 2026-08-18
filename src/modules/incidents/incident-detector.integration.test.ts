@@ -256,4 +256,74 @@ describe("Incident Detector", () => {
     });
     expect(incidents).toHaveLength(2);
   });
+
+  it("does not create duplicate incident when one is ACKNOWLEDGED", async () => {
+    // Submit initial reports to create incident
+    for (let i = 0; i < 3; i++) {
+      await submitReport(
+        {
+          serviceId,
+          issueType: "UNAVAILABLE",
+        },
+        generateReporterToken(),
+        REPORTER_HMAC_SECRET
+      );
+    }
+
+    const initialIncidents = await prisma.incident.findMany({
+      where: { serviceId },
+    });
+    expect(initialIncidents).toHaveLength(1);
+    expect(initialIncidents[0].state).toBe("OPEN");
+
+    // Acknowledge the incident (simulating owner acknowledgment)
+    await prisma.incident.update({
+      where: { id: initialIncidents[0].id },
+      data: { state: "ACKNOWLEDGED" },
+    });
+
+    // Age out old reports so count drops below threshold
+    const oldDate = new Date(Date.now() - 11 * 60 * 1000);
+    await prisma.report.updateMany({
+      where: { serviceId },
+      data: { reportedAt: oldDate },
+    });
+
+    // Trigger evaluation to re-arm detection
+    await evaluateService(serviceId);
+
+    // Verify detection is re-armed
+    const service = await prisma.service.findUniqueOrThrow({
+      where: { id: serviceId },
+    });
+    expect(service.detectionArmed).toBe(true);
+
+    // Submit more reports above threshold from different tokens
+    for (let i = 0; i < 3; i++) {
+      await submitReport(
+        {
+          serviceId,
+          issueType: "UNAVAILABLE",
+        },
+        generateReporterToken(),
+        REPORTER_HMAC_SECRET
+      );
+    }
+
+    // Still only one incident (ACKNOWLEDGED incident is still active)
+    const finalIncidents = await prisma.incident.findMany({
+      where: { serviceId },
+    });
+    expect(finalIncidents).toHaveLength(1);
+    expect(finalIncidents[0].id).toBe(initialIncidents[0].id);
+
+    // And still only one OPENING notification
+    const jobs = await prisma.notificationJob.findMany({
+      where: {
+        incident: { serviceId },
+        notificationType: "OPENING",
+      },
+    });
+    expect(jobs).toHaveLength(1);
+  });
 });
