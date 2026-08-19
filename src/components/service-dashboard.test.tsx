@@ -17,6 +17,7 @@ const mockServices: ServiceListItem[] = [
     id: "1",
     name: "Jira",
     slug: "jira",
+    baseUrl: "https://jira.example.com",
     category: "Developer Tools",
     issueTypes: ["UNAVAILABLE", "SLOW", "LOGIN"],
     currentState: "OPERATIONAL",
@@ -34,6 +35,7 @@ const mockServices: ServiceListItem[] = [
     id: "2",
     name: "VPN",
     slug: "vpn",
+    baseUrl: "https://vpn.example.com",
     category: "Connectivity",
     issueTypes: ["UNAVAILABLE", "SLOW", "CONNECTIVITY"],
     currentState: "REPORTS_RISING",
@@ -57,6 +59,7 @@ const mockServices: ServiceListItem[] = [
     id: "3",
     name: "Bitbucket",
     slug: "bitbucket",
+    baseUrl: "https://bitbucket.example.com",
     category: "Developer Tools",
     issueTypes: ["UNAVAILABLE", "SLOW", "LOGIN"],
     currentState: "OPERATIONAL",
@@ -93,6 +96,15 @@ describe("ServiceDashboard", () => {
     expect(
       screen.getByRole("button", { name: "Refresh service status" })
     ).toBeVisible();
+  });
+
+  it("renders each service base URL below its name", () => {
+    render(<ServiceDashboard services={mockServices} />);
+
+    const jiraUrl = screen.getByRole("link", { name: "https://jira.example.com" });
+
+    expect(jiraUrl).toHaveAttribute("href", "https://jira.example.com");
+    expect(jiraUrl).toHaveAttribute("target", "_blank");
   });
 
   it("searches for 'jira' and finds one service", async () => {

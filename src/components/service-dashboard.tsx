@@ -158,6 +158,7 @@ export function ServiceDashboard({ services }: ServiceDashboardProps) {
           <ServiceRow
             key={service.id}
             name={service.name}
+            baseUrl={service.baseUrl}
             category={service.category}
             currentState={
               service.currentState as

@@ -3,6 +3,7 @@ import { StatusBadge } from "./status-badge";
 
 type ServiceRowProps = Readonly<{
   name: string;
+  baseUrl: string;
   category: string;
   currentState: "OPERATIONAL" | "REPORTS_RISING" | "INCIDENT_CONFIRMED";
   reportCount: number;
@@ -15,6 +16,7 @@ type ServiceRowProps = Readonly<{
 
 export function ServiceRow({
   name,
+  baseUrl,
   category,
   currentState,
   reportCount,
@@ -33,6 +35,16 @@ export function ServiceRow({
         <div>
           <p className="service-category">{category}</p>
           <h3 className="service-name">{name}</h3>
+          {baseUrl && (
+            <a
+              className="service-url"
+              href={baseUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {baseUrl}
+            </a>
+          )}
         </div>
         <StatusBadge state={currentState} />
         <div className="service-stats">

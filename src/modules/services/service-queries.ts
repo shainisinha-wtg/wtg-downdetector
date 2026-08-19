@@ -37,6 +37,7 @@ export interface ServiceListItem {
   id: string;
   name: string;
   slug: string;
+  baseUrl: string;
   category: string;
   issueTypes: IssueType[];
   currentState: string;
@@ -227,6 +228,7 @@ export async function getServiceList(
       id: service.id,
       name: service.name,
       slug: service.slug,
+      baseUrl: service.baseUrl,
       category: service.category,
       issueTypes: service.issueTypes,
       currentState: stateInfo.state,

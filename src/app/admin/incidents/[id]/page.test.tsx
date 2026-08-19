@@ -7,9 +7,16 @@ vi.mock("@/modules/auth/require-admin", () => ({
 
 vi.mock("@/lib/db", () => ({
   prisma: {
+    report: {
+      groupBy: vi.fn().mockResolvedValue([
+        { issueType: "UNAVAILABLE", _count: { id: 3 } },
+        { issueType: "SLOW", _count: { id: 1 } },
+      ]),
+    },
     incident: {
       findUnique: vi.fn().mockResolvedValue({
         id: "incident-id",
+        serviceId: "service-id",
         state: "OPEN",
         openedAt: new Date("2026-08-18T12:00:00Z"),
         acknowledgedAt: null,
@@ -17,7 +24,10 @@ vi.mock("@/lib/db", () => ({
         reportCountAtOpening: 5,
         thresholdCountSnapshot: 10,
         thresholdWindowSnapshot: 10,
-        service: { name: "Jira" },
+        service: {
+          name: "Jira",
+          issueTypes: ["UNAVAILABLE", "SLOW", "LOGIN"],
+        },
         updates: [],
       }),
     },
@@ -35,6 +45,9 @@ describe("IncidentDetailPage", () => {
     render(await IncidentDetailPage({ params: Promise.resolve({ id: "incident-id" }) }));
 
     expect(screen.getByText("Incident overview")).toBeVisible();
+    expect(screen.getByText("UNAVAILABLE: 3")).toBeVisible();
+    expect(screen.getByText("SLOW: 1")).toBeVisible();
+    expect(screen.getByText("LOGIN: 0")).toBeVisible();
     expect(screen.getByText("Timeline")).toBeVisible();
     expect(screen.getByRole("button", { name: "Acknowledge Incident" })).toBeVisible();
     expect(screen.getByLabelText("Publish Update")).toHaveAttribute("name", "note");

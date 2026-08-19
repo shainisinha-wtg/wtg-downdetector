@@ -42,6 +42,24 @@ export default async function IncidentDetailPage({
     notFound();
   }
 
+  const issueTypeCounts = await prisma.report.groupBy({
+    by: ["issueType"],
+    where: {
+      serviceId: incident.serviceId,
+      reportedAt: {
+        gte: new Date(
+          incident.openedAt.getTime() -
+            incident.thresholdWindowSnapshot * 60 * 1000
+        ),
+        lte: incident.openedAt,
+      },
+    },
+    _count: { id: true },
+  });
+  const issueTypeCountByType = new Map(
+    issueTypeCounts.map(({ issueType, _count }) => [issueType, _count.id])
+  );
+
   const isActive = incident.state === "OPEN" || incident.state === "ACKNOWLEDGED";
 
   return (
@@ -72,6 +90,16 @@ export default async function IncidentDetailPage({
             <div>
               <dt>Report count</dt>
               <dd>{incident.reportCountAtOpening}</dd>
+            </div>
+            <div>
+              <dt>Issue types</dt>
+              <dd>
+                {incident.service.issueTypes.map((issueType) => (
+                  <div key={issueType}>
+                    {issueType}: {issueTypeCountByType.get(issueType) ?? 0}
+                  </div>
+                ))}
+              </dd>
             </div>
             <div>
               <dt>Threshold</dt>
