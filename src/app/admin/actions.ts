@@ -17,6 +17,11 @@ import {
   resolveIncident,
   InvalidTransitionError,
 } from "@/modules/incidents/incident-management";
+import {
+  cancelMaintenanceWindow,
+  scheduleMaintenanceWindow,
+  InvalidMaintenanceWindowError,
+} from "@/modules/maintenance/maintenance-windows";
 
 // Validation schemas
 const serviceFieldsSchema = z.object({
@@ -66,6 +71,22 @@ const resolveIncidentSchema = z.object({
 
 const retryNotificationSchema = z.object({
   jobId: z.string().uuid(),
+});
+
+const scheduleMaintenanceSchema = z
+  .object({
+    serviceId: z.string().uuid(),
+    title: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(1000).optional(),
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime(),
+  })
+  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
+    message: "End time must be after start time",
+  });
+
+const cancelMaintenanceSchema = z.object({
+  maintenanceWindowId: z.string().uuid(),
 });
 
 /**
@@ -249,5 +270,72 @@ export async function retryNotification(data: unknown) {
       error:
         error instanceof Error ? error.message : "Failed to retry notification",
     };
+  }
+}
+
+/**
+ * Schedule an upcoming maintenance window for a service
+ */
+export async function scheduleMaintenanceWindowAction(data: unknown) {
+  const admin = await requireAdmin();
+
+  try {
+    const validated = scheduleMaintenanceSchema.parse(data);
+
+    await scheduleMaintenanceWindow(
+      {
+        serviceId: validated.serviceId,
+        title: validated.title,
+        description: validated.description,
+        startsAt: new Date(validated.startsAt),
+        endsAt: new Date(validated.endsAt),
+      },
+      admin.id,
+    );
+
+    revalidatePath("/admin/services");
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof InvalidMaintenanceWindowError) {
+      return { error: error.message };
+    }
+    if (error instanceof z.ZodError) {
+      return {
+        error:
+          "Validation failed: " +
+          error.errors.map((item) => item.message).join(", "),
+      };
+    }
+    console.error("Maintenance window scheduling failed");
+    return { error: "Failed to schedule maintenance window" };
+  }
+}
+
+/**
+ * Cancel a scheduled maintenance window
+ */
+export async function cancelMaintenanceWindowAction(data: unknown) {
+  const admin = await requireAdmin();
+
+  try {
+    const validated = cancelMaintenanceSchema.parse(data);
+
+    await cancelMaintenanceWindow(validated.maintenanceWindowId, admin.id);
+
+    revalidatePath("/admin/services");
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof InvalidMaintenanceWindowError) {
+      return { error: error.message };
+    }
+    if (error instanceof z.ZodError) {
+      return { error: "Validation failed" };
+    }
+    console.error("Maintenance window cancellation failed");
+    return { error: "Failed to cancel maintenance window" };
   }
 }

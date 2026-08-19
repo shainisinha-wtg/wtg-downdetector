@@ -1,10 +1,14 @@
 import { ServiceDashboard } from "@/components/service-dashboard";
 import { getServiceList } from "@/modules/services/service-queries";
+import { getUpcomingMaintenanceWindows } from "@/modules/maintenance/maintenance-windows";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const services = await getServiceList();
+  const [services, maintenanceWindows] = await Promise.all([
+    getServiceList(),
+    getUpcomingMaintenanceWindows(),
+  ]);
 
   return (
     <>
@@ -19,7 +23,10 @@ export default async function HomePage() {
         </div>
       </header>
       <main>
-        <ServiceDashboard services={services} />
+        <ServiceDashboard
+          services={services}
+          maintenanceWindows={maintenanceWindows}
+        />
       </main>
     </>
   );

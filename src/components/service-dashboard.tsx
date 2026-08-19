@@ -5,13 +5,19 @@ import { Search } from "lucide-react";
 import { ServiceRow } from "./service-row";
 import { ReportDialog } from "./report-dialog";
 import { RefreshButton } from "./refresh-button";
+import { UpcomingMaintenance } from "./upcoming-maintenance";
 import { ServiceListItem } from "@/modules/services/service-queries";
+import { MaintenanceWindowSummary } from "@/modules/maintenance/maintenance-windows";
 
 type ServiceDashboardProps = Readonly<{
   services: ServiceListItem[];
+  maintenanceWindows?: MaintenanceWindowSummary[];
 }>;
 
-export function ServiceDashboard({ services }: ServiceDashboardProps) {
+export function ServiceDashboard({
+  services,
+  maintenanceWindows = [],
+}: ServiceDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -114,8 +120,7 @@ export function ServiceDashboard({ services }: ServiceDashboardProps) {
       </div>
 
       <div className="dashboard-filters">
-        <div className="search-box">
-          <Search size={20} aria-hidden="true" />
+        <div className="search-box">          <Search size={20} aria-hidden="true" />
           <input
             type="search"
             placeholder="Search services..."
@@ -146,6 +151,8 @@ export function ServiceDashboard({ services }: ServiceDashboardProps) {
           ))}
         </div>
       </div>
+
+      <UpcomingMaintenance windows={maintenanceWindows} />
 
       <div className="services-list">
         {filteredServices.length === 0 && (

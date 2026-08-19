@@ -5,13 +5,17 @@ import Link from "next/link";
 import { AdminShell } from "@/components/admin-shell";
 import { ServiceEditDialog } from "@/components/service-edit-dialog";
 import { ServiceCreateDialog } from "@/components/service-create-dialog";
+import { MaintenanceScheduleDialog } from "@/components/maintenance-schedule-dialog";
+import { MaintenanceCancelButton } from "@/components/maintenance-cancel-button";
+import { getUpcomingMaintenanceWindows } from "@/modules/maintenance/maintenance-windows";
 
 export default async function AdminServicesPage() {
   await requireAdmin();
 
-  const services = await prisma.service.findMany({
-    orderBy: { name: "asc" },
-  });
+  const [services, maintenanceWindows] = await Promise.all([
+    prisma.service.findMany({ orderBy: { name: "asc" } }),
+    getUpcomingMaintenanceWindows({ includeDisabledServices: true }),
+  ]);
 
   return (
     <AdminShell
@@ -80,25 +84,46 @@ export default async function AdminServicesPage() {
                     </span>
                   </td>
                   <td>
-                    <ServiceEditDialog
-                      service={service}
-                      action={async (formData) => {
-                        "use server";
-                        const { updateService } = await import("../actions");
-                        return updateService({
-                          serviceId: service.id,
-                          category: formData.get("category"),
-                          baseUrl: formData.get("baseUrl"),
-                          thresholdCount: Number(formData.get("thresholdCount")),
-                          thresholdWindowMinutes: Number(
-                            formData.get("thresholdWindowMinutes"),
-                          ),
-                          ownerEmail: formData.get("ownerEmail"),
-                          issueTypes: formData.getAll("issueTypes"),
-                          enabled: formData.get("enabled") === "on",
-                        });
-                      }}
-                    />
+                    <div className="admin-row-actions">
+                      <MaintenanceScheduleDialog
+                        service={{ id: service.id, name: service.name }}
+                        action={async (formData) => {
+                          "use server";
+                          const { scheduleMaintenanceWindowAction } =
+                            await import("../actions");
+                          const description = formData.get("description");
+                          return scheduleMaintenanceWindowAction({
+                            serviceId: formData.get("serviceId"),
+                            title: formData.get("title"),
+                            description:
+                              typeof description === "string" && description.trim()
+                                ? description
+                                : undefined,
+                            startsAt: formData.get("startsAt"),
+                            endsAt: formData.get("endsAt"),
+                          });
+                        }}
+                      />
+                      <ServiceEditDialog
+                        service={service}
+                        action={async (formData) => {
+                          "use server";
+                          const { updateService } = await import("../actions");
+                          return updateService({
+                            serviceId: service.id,
+                            category: formData.get("category"),
+                            baseUrl: formData.get("baseUrl"),
+                            thresholdCount: Number(formData.get("thresholdCount")),
+                            thresholdWindowMinutes: Number(
+                              formData.get("thresholdWindowMinutes"),
+                            ),
+                            ownerEmail: formData.get("ownerEmail"),
+                            issueTypes: formData.getAll("issueTypes"),
+                            enabled: formData.get("enabled") === "on",
+                          });
+                        }}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -106,6 +131,73 @@ export default async function AdminServicesPage() {
           </table>
         </div>
       )}
+
+      <section className="admin-section">
+        <h2>Maintenance windows</h2>
+        <p className="cell-meta">
+          Scheduled and in-progress windows are shown to employees on the status
+          page.
+        </p>
+
+        {maintenanceWindows.length === 0 ? (
+          <p className="admin-empty-state">No maintenance windows scheduled.</p>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Summary</th>
+                  <th>Starts</th>
+                  <th>Ends</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {maintenanceWindows.map((window) => (
+                  <tr key={window.id}>
+                    <td>{window.serviceName}</td>
+                    <td>
+                      <div>{window.title}</div>
+                      {window.description && (
+                        <div className="cell-meta">{window.description}</div>
+                      )}
+                    </td>
+                    <td suppressHydrationWarning>
+                      {window.startsAt.toLocaleString()}
+                    </td>
+                    <td suppressHydrationWarning>
+                      {window.endsAt.toLocaleString()}
+                    </td>
+                    <td>
+                      <span
+                        className={`status-badge ${
+                          window.inProgress ? "badge-amber" : "badge-green"
+                        }`}
+                      >
+                        {window.inProgress ? "In progress" : "Scheduled"}
+                      </span>
+                    </td>
+                    <td>
+                      <MaintenanceCancelButton
+                        action={async () => {
+                          "use server";
+                          const { cancelMaintenanceWindowAction } =
+                            await import("../actions");
+                          return cancelMaintenanceWindowAction({
+                            maintenanceWindowId: window.id,
+                          });
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </AdminShell>
   );
 }
